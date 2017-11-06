@@ -158,8 +158,8 @@ start_app([MyWindow1(),   # instance for single-instance. localhost:8888/index.h
 
 Status
 ------
-alpha
+Alpha
 
 
-Copyright (c) 2017 Tamini Bean
+Copyright (c) 2017 Tamini Bean  
 License: MIT
