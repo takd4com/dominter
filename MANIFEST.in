@@ -1,0 +1,4 @@
+include tox.ini
+include README.rst
+recursive-include test *
+recursive-include examples *
