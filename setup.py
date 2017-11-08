@@ -16,7 +16,7 @@ setup(
     url='https://github.com/takd4com/dominter',
     keywords='dom browser gui asynchronous web',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 2 - Pre-Alpha',
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
