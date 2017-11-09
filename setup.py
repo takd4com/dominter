@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='dominter',
-    version='0.0.1',
+    version='0.0.2',
     description='A simple GUI package for small asynchronous web application',
     author='Tamini Bean',
     author_email='takd4com@gmail.com',
