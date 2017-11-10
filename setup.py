@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from setuptools import setup
+import io
 
 setup(
     name='dominter',
-    version='0.0.2',
+    version='0.0.3',
     description='A simple GUI package for small asynchronous web application',
+    long_description=io.open('README.rst', encoding='utf-8').read(),
     author='Tamini Bean',
     author_email='takd4com@gmail.com',
     packages=['dominter', ],

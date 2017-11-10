@@ -11,6 +11,11 @@ Features
 * Supports both multiple-instance and single-instance.
 * Supports Element.class and Element.style properties.
 
+Installation
+------------
+
+    pip install dominter
+
 Example
 -------
 
