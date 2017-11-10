@@ -14,6 +14,8 @@ Features
 Installation
 ------------
 
+::
+
     pip install dominter
 
 Example
