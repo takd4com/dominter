@@ -3,7 +3,7 @@
 (function() {
   var excepts = ['_in_init_', 'tagName', 'document', 'parent',
     '_id', '_classList', 'eventlisteners',
-    'attributes', 'elements', '_onclick', '_onchange',
+    'attributes', 'child', '_onclick', '_onchange',
     'appendChild', 'removeChild',
   ];
   var headId, bodyId;
@@ -121,8 +121,8 @@
         //elm = document.createElement(tagname);
         elm = newElement(dat)
       }
-      if (dat.elements) {
-        appendElements(ws, elm, dat.elements);
+      if (dat.child) {
+        appendElements(ws, elm, dat.child);
       }
       if (isnew) {
         parent.appendChild(elm);
@@ -306,15 +306,15 @@
     var dic = JSON.parse(ev.data);
     if ('head' in dic) {
       var head = dic['head'];
-      if (head['elements']) {
-        appendElements(ws, document.head, head['elements']);
+      if (head['child']) {
+        appendElements(ws, document.head, head['child']);
       }
       headId = head._id;
     }
     if ('body' in dic) {
       var body = dic['body'];
-      if (body['elements']) {
-        appendElements(ws, document.body, body['elements']);
+      if (body['child']) {
+        appendElements(ws, document.body, body['child']);
       }
       bodyId = body._id;
     }

@@ -8,6 +8,7 @@ import os
 import json
 import shlex
 import re
+import collections
 from inspect import isclass
 from logging import (getLogger, basicConfig, DEBUG, INFO, WARN, ERROR)
 
@@ -171,14 +172,14 @@ class Element(object):
     """
     def __init__(self, document, tag):
         self._in_init_ = True
-        self._id = id(self)
+        self._id = str(id(self))
         self.document = document
         self.tagName = tag
         self.name = None
         self.parent = None
         self.eventlisteners = []
         self.attributes = {}
-        self.elements = []
+        self.child = []
         self._classList = ClassList(self)
         self._style = Style(self)
         self._onclick = None
@@ -214,6 +215,7 @@ class Element(object):
     # dif_dat除外
     dif_excepts = ['_in_init_', 'class', 'classList', 'style',
                    'parent', 'document', 'onclick', '_onclick',
+                   'child',
                    'onchange', '_onchange',]
 
     def pre_setattr(self, key, value):
@@ -292,18 +294,34 @@ class Element(object):
         self.document.add_diff({_OBJKEY_: self._id, 'onchange': name})
 
     def removeChild(self, elm):
-        if elm not in self.elements:
+        if elm not in self.child:
             raise ValueError('not child')
         self.document.add_diff({_OBJKEY_: self._id, 'removeChild': elm.id})
         elm.parent = None
-        self.elements.remove(elm)
+        self.child.remove(elm)
 
     def appendChild(self, elm):
         if elm.parent is not None:
             elm.parent.removeChild(elm)
-        self.elements.append(elm)
+        self.child.append(elm)
         elm.parent = self
         self.document.add_diff({_OBJKEY_: self._id, 'appendChild': elm.id})
+        # check child recursively
+        if 0 == len(elm.child):
+            return
+        que = collections.deque()
+        for child in elm.child:
+            que.append((elm, child))
+        while True:
+            try:
+                parent, child = que.popleft()
+            except IndexError:
+                break
+            if child.parent is None:
+                child.parent = parent
+                self.document.add_diff({_OBJKEY_: parent._id, 'appendChild': child.id})
+            for gson in child.child:
+                que.append((child, gson))
 
     def insertBefore(self, new_elm, ref_elm):
         """
@@ -315,8 +333,8 @@ class Element(object):
         if ref_elm is None:
             self.appendChild(new_elm)
         else:
-            pos = self.elements.index(ref_elm)
-            self.elements.insert(pos, new_elm)
+            pos = self.child.index(ref_elm)
+            self.child.insert(pos, new_elm)
             new_elm.parent = self
             self.document.add_diff({_OBJKEY_: self._id, 'insertBefore': [new_elm, ref_elm]})
 
@@ -444,6 +462,8 @@ class Document(object):
         self.diffdat.append(dat)
 
     def getElementById(self, eid):
+        if isinstance(eid, int):
+            eid = str(eid)
         return self.obj_dic.get(eid, None)
 
     def getElementsByName(self, name):
@@ -471,7 +491,7 @@ class Document(object):
     """
 
     def tag(self, tagtxt, textContent=None, innerHTML=None, attrs=None,
-            onclick=None, onchange=None, elements=None):
+            onclick=None, onchange=None, handler=None, child=None):
         """
         create a tag with a specification method similar to html.
 
@@ -481,7 +501,7 @@ class Document(object):
         :param attrs:
         :param onclick:
         :param onchange:
-        :param elements:
+        :param child:
         :return:
         """
         if not isinstance(tagtxt, str) or 0 == len(tagtxt):
@@ -528,12 +548,21 @@ class Document(object):
             elm.onclick = onclick
         if onchange is not None:
             elm.onchange = onchange
-        if elements is not None:
-            if isinstance(elements, list) or isinstance(elements, tuple):
-                elm.elements = elements
+        self.add_handler(elm, handler)
+        if child is not None:
+            if isinstance(child, list) or isinstance(child, tuple):
+                elm.child = child
             else:
-                elm.elements = [elements, ]
+                elm.child = [child, ]
         return elm
+
+    def add_handler(self, elm, handler):
+        if handler is not None:
+            if isinstance(handler[0], str):
+                elm.addEventListener(handler[0], handler[1])
+            else:
+                for hdr in handler:
+                    elm.addEventListener(hdr[0], hdr[1])
 
     def create_with(self, tag, type_=None,
                     value=None, src=None, name=None, textContent=None,
@@ -544,8 +573,10 @@ class Document(object):
                     integrity=None, media=None, scoped=None, crossorigin=None,
                     longdesc=None, sizes=None, referrerpolicy=None,
                     srcset=None, download=None, target=None,
-                    style=None, className=None, readonly=None, disabled=None,
-                    onclick=None, onchange=None):
+                    readonly=None, disabled=None, placeholder=None, for_=None,
+                    id_=None, accesskey=None, hidden=None, tabindex=None,
+                    style=None, className=None, child=None,
+                    onclick=None, onchange=None, handler=None):
         elm = self.createElement(tag)
         if type_ is not None:
             elm.type = type_
@@ -609,18 +640,34 @@ class Document(object):
             elm.download = download
         if target is not None:
             elm.target = target
-        if className is not None:
-            elm.className = className
-        if style is not None:
-            elm.style.cssText = style
         if readonly is not None:
             elm.readonly = readonly
         if disabled is not None:
             elm.disabled = disabled
+        if placeholder is not None:
+            elm.placeholder = placeholder
+        if for_ is not None:
+            elm.for_ = for_
+        if id_ is not None:
+            elm.id = id_
+        if accesskey is not None:
+            elm.accesskey = accesskey
+        if hidden is not None:
+            elm.hidden = hidden
+        if tabindex is not None:
+            elm.tabindex = tabindex
+        if className is not None:
+            elm.className = className
+        if style is not None:
+            elm.style.cssText = style
+        if child is not None:
+            elm.child = child
         if onclick is not None:
             elm.onclick = onclick
         if onchange is not None:
             elm.onchange = onchange
+        self.add_handler(elm, handler)
+
         return elm
 
     @staticmethod
@@ -630,207 +677,287 @@ class Document(object):
             if val is not None:
                 res[key] = val
 
-    def title(self, text):
-        return self.create_with('title', textContent=text)
+    def title(self, text, id_=None):
+        return self.create_with('title', textContent=text, id_=id_)
 
-    def style(self, textContent, type_='text/css', media=None, scoped=None):
+    def style(self, textContent, type_='text/css', media=None, scoped=None, id_=None):
         return self.create_with('style', textContent=textContent, type_=type_,
-                                media=media, scoped=scoped)
+                                media=media, scoped=scoped, id_=id_)
 
-    def link(self, href, rel='stylesheet', integrity=None, media=None):
+    def link(self, href, rel='stylesheet', integrity=None, media=None, id_=None):
         return self.create_with('link', href=href, rel=rel, integrity=integrity,
-                                media=media)
+                                media=media, id_=id_)
 
     def script(self, textContent='', type='text/javascript', src=None,
-               crossorigin=None):
+               crossorigin=None, id_=None):
         return self.create_with('script', textContent=textContent, type_=type,
-                                src=src, crossorigin=crossorigin)
+                                src=src, crossorigin=crossorigin, id_=id_)
 
-    def br(self):
-        return self.create_with('br')
+    def br(self, id_=None):
+        return self.create_with('br', id_=id_)
 
-    def p(self, textContent, style=None, className=None):
+    def p(self, textContent, id_=None, style=None, className=None):
         return self.create_with('p', textContent=textContent,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def span(self, textContent, style=None, className=None):
+    def span(self, textContent, id_=None, style=None, className=None):
         return self.create_with('span', textContent=textContent,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def div(self, textContent=None, style=None, className=None):
+    def div(self, textContent=None, id_=None, style=None, className=None,
+            child=None):
         return self.create_with('div', textContent=textContent,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className,
+                                child=child)
 
     def button(self, textContent='', type_='button', name=None, value=None,
                disabled=None, onclick=None,
-               style=None, className=None):
+               id_=None, style=None, className=None):
         return self.create_with('button', textContent=textContent,
                                 type_=type_, name=name, value=value,
                                 disabled=disabled, onclick=onclick,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
+
+    def input(self, value='', onchange=None,
+             readonly=None, disabled=None, placeholder=None,
+             id_=None, style=None, className=None):
+        return self.create_with('input', value=value,
+                                onchange=onchange, readonly=readonly,
+                                disabled=disabled, placeholder=placeholder,
+                                id_=id_, style=style, className=className)
 
     def text(self, value='', type_='text', onchange=None,
-             readonly=None, disabled=None, style=None, className=None):
+             readonly=None, disabled=None, placeholder=None,
+             id_=None, style=None, className=None):
         return self.create_with('input', type_=type_, value=value,
                                 onchange=onchange, readonly=readonly,
-                                disabled=disabled,
-                                style=style, className=className)
+                                disabled=disabled, placeholder=placeholder,
+                                id_=id_, style=style, className=className)
 
     def checkbox(self, checked=False, value=None, onchange=None,
-                 readonly=None, disabled=None, style=None, className=None):
+                 readonly=None, disabled=None,
+                 id_=None, style=None, className=None):
         return self.create_with('input', type_='checkbox', value=value,
                                 checked=checked, readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def radio(self, name, value, checked=False, onchange=None,
-              readonly=None, disabled=None, style=None, className=None):
+              readonly=None, disabled=None,
+              id_=None, style=None, className=None):
         return self.create_with('input', type_='radio', name=name, value=value,
                                 checked=checked, readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def color(self, value='', onchange=None,
-              readonly=None, disabled=None, style=None, className=None):
+    def color(self, value='', onchange=None, readonly=None, disabled=None,
+              id_=None, style=None, className=None):
         return self.create_with('input', type_='color', value=value,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def date(self, value='', onchange=None,
-             readonly=None, disabled=None, style=None, className=None):
+    def date(self, value='', onchange=None, readonly=None, disabled=None,
+             id_=None, style=None, className=None):
         return self.create_with('input', type_='date', value=value,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def datetime_local(self, value='', onchange=None, step='1',
-                       readonly=None, disabled=None, style=None, className=None):
+                       readonly=None, disabled=None,
+                       id_=None, style=None, className=None):
         return self.create_with('input', type_='datetime-local', value=value,
                                 step=step, readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def month(self, value='', onchange=None,
-              readonly=None, disabled=None, style=None, className=None):
+    def month(self, value='', onchange=None, readonly=None, disabled=None,
+              id_=None, style=None, className=None):
         return self.create_with('input', type_='month', value=value,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def time(self, value='', onchange=None, step='1',
-             readonly=None, disabled=None, style=None, className=None):
+             readonly=None, disabled=None,
+             id_=None, style=None, className=None):
         return self.create_with('input', type_='time', value=value,
                                 step=step, readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def week(self, value='', onchange=None,
-             readonly=None, disabled=None, style=None, className=None):
+    def week(self, value='', onchange=None, readonly=None, disabled=None,
+             id_=None, style=None, className=None):
         return self.create_with('input', type_='week', value=value,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def file(self, value='', onchange=None,
-             readonly=None, disabled=None, style=None, className=None):
+    def file(self, value='', onchange=None, readonly=None, disabled=None,
+             id_=None, style=None, className=None):
         return self.create_with('input', type_='file', value=value,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def number(self, value='', min=None, max=None, step=None, onchange=None,
-               readonly=None, disabled=None, style=None, className=None):
+               readonly=None, disabled=None,
+               id_=None, style=None, className=None):
         return self.create_with('input', type_='number', value=value,
                                 min=min, max=max, step=step,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def password(self, value='', onchange=None,
-                 readonly=None, disabled=None, style=None, className=None):
+    def password(self, value='', onchange=None, readonly=None, disabled=None,
+                 id_=None, style=None, className=None):
         return self.create_with('input', type_='password', value=value,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def range(self, value='', min='0', max='100', step='1', onchange=None,
-              readonly=None, disabled=None, style=None, className=None):
+              readonly=None, disabled=None,
+              id_=None, style=None, className=None):
         return self.create_with('input', type_='range', value=value,
                                 min=min, max=max, step=step,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def select(self, value=None, selectedIndex=None, name=None, onchange=None,
-               multiple=None, size=None,
-               readonly=None, disabled=None, style=None, className=None):
+               multiple=None, size=None, readonly=None, disabled=None,
+               id_=None, style=None, className=None):
         return self.create_with('select', value=value, name=name,
                                 selectedIndex=selectedIndex, multiple=multiple,
                                 size=size, readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def option(self, value, textContent, label=None, selected=None,
-               onchange=None,
-               readonly=None, disabled=None, style=None, className=None):
+               onchange=None, readonly=None, disabled=None,
+               id_=None, style=None, className=None):
         return self.create_with('option', value=value, textContent=textContent,
                                 label=label, selected=selected,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def textarea(self, value, rows=None, cols=None, onchange=None,
-                 readonly=None, disabled=None, style=None, className=None):
+                 readonly=None, disabled=None,
+                 id_=None, style=None, className=None):
         return self.create_with('textarea', value=value, rows=rows, cols=cols,
                                 readonly=readonly,
                                 onchange=onchange, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def table(self, align=None,
-              readonly=None, disabled=None, style=None, className=None):
+    def table(self, readonly=None, disabled=None,
+              id_=None, style=None, className=None, child=None):
         return self.create_with('table',
                                 readonly=readonly, disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className,
+                                child=child)
 
-    def tr(self, style=None, className=None):
-        return self.create_with('tr', style=style, className=className)
+    def tr(self, id_=None, style=None, className=None, child=None):
+        return self.create_with('tr',
+                                id_=id_, style=style, className=className,
+                                child=child)
 
-    def th(self, textContent, style=None, className=None):
+    def th(self, textContent, id_=None, style=None, className=None):
         return self.create_with('th', textContent=textContent,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def td(self, textContent, style=None, className=None):
+    def td(self, textContent, id_=None, style=None, className=None):
         return self.create_with('td', textContent=textContent,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
-    def fieldset(self, textContent='',
-                 disabled=None, style=None, className=None):
+    def fieldset(self, textContent='', disabled=None,
+                 id_=None, style=None, className=None, child=None):
         return self.create_with('fieldset', textContent=textContent,
                                 disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className,
+                                child=child)
 
-    def legend(self, textContent,
-               disabled=None, style=None, className=None):
+    def legend(self, textContent, disabled=None,
+               id_=None, style=None, className=None):
         return self.create_with('legend', textContent=textContent,
                                 disabled=disabled,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def img(self, src, alt='', width=None, height=None, onclick=None,
             crossorigin=None, longdesc=None, sizes=None, referrerpolicy=None,
-            srcset=None, style=None, className=None):
+            srcset=None, id_=None, style=None, className=None):
         return self.create_with('img', src=src, alt=alt, width=width, height=height,
                                 onclick=onclick, crossorigin=crossorigin,
                                 longdesc=longdesc, sizes=sizes,
                                 referrerpolicy=referrerpolicy, srcset=srcset,
-                                style=style, className=className)
+                                id_=id_, style=style, className=className)
 
     def a(self, href, textContent, download=None, rel=None, target=None,
-          referrerpolicy=None, style=None, className=None):
+          referrerpolicy=None, id_=None, style=None, className=None):
         return self.create_with('a', href=href, textContent=textContent,
                                 download=download, rel=rel, target=target,
                                 referrerpolicy=referrerpolicy,
+                                id_=id_, style=style, className=className)
+
+    def label(self, textContent, for_=None,
+              id_=None, style=None, className=None):
+        return self.create_with('label', textContent=textContent, for_=for_,
+                                id_=id_, style=style, className=className)
+
+    def h1(self, textContent, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None):
+        return self.create_with('h1', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
                                 style=style, className=className)
+
+    def ol(self, textContent=None, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None, child=None):
+        return self.create_with('ol', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className,
+                                child=child)
+
+    def li(self, textContent=None, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None, child=None):
+        return self.create_with('li', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className,
+                                child=child)
+
+    def ul(self, id_=None, accesskey=None, hidden=None, tabindex=None,
+                style=None, className=None, child=None):
+        return self.create_with('ul', id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className,
+                                child=child)
+
+    def section(self, id_=None, accesskey=None, hidden=None, tabindex=None,
+                style=None, className=None, child=None):
+        return self.create_with('section', id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className,
+                                child=child)
+
+    def header(self, id_=None, accesskey=None, hidden=None, tabindex=None,
+                style=None, className=None, child=None):
+        return self.create_with('header',
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className,
+                                child=child)
+
+    def footer(self, id_=None, accesskey=None, hidden=None, tabindex=None,
+                style=None, className=None, child=None):
+        return self.create_with('footer',
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className,
+                                child=child)
 
 
 class Window(object):
@@ -838,14 +965,18 @@ class Window(object):
     virtual window class
     """
     def __init__(self):
+        #self.location = ''
+        #self.name = ''
         self.document = Document()
-        self.location = ''
-        self.name = ''
+        doc = self.document
+        # copy document method
+        self
 
-    def dumps(self):
+
+    def _dumps(self):
         if self.document.dirty:
             logger.debug('create cache')
-            str = json.dumps(self.document, default=self.serializer, indent=2)
+            str = json.dumps(self.document, default=self._serializer, indent=2)
             self.document.cache = str
             self.document.dirty = False
         else:
@@ -853,7 +984,7 @@ class Window(object):
         return str
 
     @staticmethod
-    def serializer(obj):
+    def _serializer(obj):
         if isinstance(obj, Document):
             return {'head': obj.head, 'body': obj.body}
         if isinstance(obj, Element):
@@ -925,7 +1056,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         if self not in self.clients[wins]:
             self.clients[wins].append(self)
         if self.window is not None:
-            dat = self.window.dumps()
+            dat = self.window._dumps()
             self.write_message(dat)
 
     def on_message(self, msg):
@@ -1094,7 +1225,7 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
         for win in winlst:
             if not isclass(win):
                 # create cache if single instance
-                win.dumps()
+                win._dumps()
 
     app.listen(port)
     if not silent:
