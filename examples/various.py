@@ -230,12 +230,12 @@ class MyWindow(Window):
 
     def on_tbl_btn(self, ev):
         self.dmycnt += 1
-        if len(self.table1.elements) > 3:
+        if len(self.table1.child) > 3:
             self.tbl1d[0][0].textContent = 'changed!00_' + str(self.dmycnt)
             self.tbl1d[1][1].textContent = 'changed!11_' + str(self.dmycnt)
             self.tbl1d[2][2].textContent = 'changed!22_' + str(self.dmycnt)
             self.tbl1d[3][3].textContent = 'changed!33_' + str(self.dmycnt)
-            self.table1.removeChild(self.table1.elements[2])
+            self.table1.removeChild(self.table1.child[2])
             del(self.tbl1d[2])
 
     def on_inputs_btn(self, ev):
