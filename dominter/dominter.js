@@ -2,9 +2,14 @@
 
 (function() {
   var excepts = ['_in_init_', 'tagName', 'document', 'parent',
-    '_id', '_classList', 'eventlisteners',
-    'attributes', 'child', '_onclick', '_onchange',
-    'appendChild', 'removeChild',
+    '_id', '_objid_', '_classList', 'eventlisteners',
+    'attributes', '_child', '_onclick', 'onclick', '_onchange', 'onchange',
+    'setAttributes', 'removeAttributes',
+    '_clearChild', '_reverseChild', '_on',
+    'addClass', 'removeClass', 'clearClass',
+    'setStyle', 'deleteStyle', 'clearStyle',
+    'removeChild', 'appendChild', '_insertBefore', '_replaceChild',
+    '_sortChild',
   ];
   var headId, bodyId;
 
@@ -121,8 +126,8 @@
         //elm = document.createElement(tagname);
         elm = newElement(dat)
       }
-      if (dat.child) {
-        appendElements(ws, elm, dat.child);
+      if (dat._child) {
+        appendElements(ws, elm, dat._child);
       }
       if (isnew) {
         parent.appendChild(elm);
@@ -200,6 +205,31 @@
             elm.removeAttribute(key);
           }
         }
+        if ('_clearChild' in dat) {
+          while (elm.firstChild) {
+            elm.removeChild(elm.firstChild);
+          }
+        }
+        if ('_reverseChild' in dat) {
+          var cnt = elm.children.length;
+          for (var j = 0; j < cnt/2; j++) {
+            elm.insertBefore(elm.children[j], elm.children[cnt-1-j]);
+            elm.insertBefore(elm.children[cnt-1-j], elm.children[j]);
+          }
+        }
+        if ('_sortChild' in dat) {
+          var lst = dat['_sortChild'];
+          var pre = [];
+          for (var chd of elm.children) {
+            pre.push(chd);
+          }
+          while (elm.firstChild) {
+            elm.removeChild(elm.firstChild);
+          }
+          for (var od of lst) {
+            elm.appendChild(pre[od]);
+          }
+        }
         if ('addClass' in dat) {
           var lst = dat['addClass'];
           for (var cls of lst) {
@@ -246,8 +276,8 @@
             elm.appendChild(child);
           }
         }
-        if ('insertBefor' in dat) {
-          var lst = dat['insertBefor'];
+        if ('_insertBefore' in dat) {
+          var lst = dat['_insertBefore'];
           var newid = lst[0];
           var refid = lst[1];
           var newelm = document.getElementById(newid);
@@ -260,7 +290,28 @@
               refelm = findElm(newdic, refid);
             }
             if (refelm) {
-              elm.insertBefor(newelm, refelm);
+              elm.insertBefore(newelm, refelm);
+            }
+            else {
+              elm.appendChild(newelm);
+            }
+          }
+        }
+        if ('_replaceChild' in dat) {
+          var lst = dat['_replaceChild'];
+          var newid = lst[0];
+          var oldid = lst[1];
+          var newelm = document.getElementById(newid);
+          if (!newelm) {
+            newelm = findElm(newdic, newid);
+          }
+          if (newelm) {
+            var oldelm = document.getElementById(olcid);
+            if (!oldelm) {
+              oldelm = findElm(newdic, oldid);
+            }
+            if (oldelm) {
+              elm.replaceChild(newelm, oldelm);
             }
             else {
               elm.appendChild(newelm);
@@ -306,15 +357,15 @@
     var dic = JSON.parse(ev.data);
     if ('head' in dic) {
       var head = dic['head'];
-      if (head['child']) {
-        appendElements(ws, document.head, head['child']);
+      if (head['_child']) {
+        appendElements(ws, document.head, head['_child']);
       }
       headId = head._id;
     }
     if ('body' in dic) {
       var body = dic['body'];
-      if (body['child']) {
-        appendElements(ws, document.body, body['child']);
+      if (body['_child']) {
+        appendElements(ws, document.body, body['_child']);
       }
       bodyId = body._id;
     }

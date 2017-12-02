@@ -4,6 +4,7 @@ dominter: Simple Python GUI (Graphical User Interface) package for small asynchr
 Copyright (c) 2017 Tamini Bean
 License: MIT
 """
+import sys
 import os
 import json
 import shlex
@@ -22,34 +23,123 @@ logger = getLogger(__name__)
 _OBJKEY_ = '_objid_'
 
 
-class ClassList(list):
-    """
-    element.class property class
-    """
-    def __init__(self, elm, init_val=None):
+class HookList(list):
+    def __init__(self, init_val=None, add_hook=None, extend_hook=None,
+                 insert_hook=None, remove_hook=None, pop_hook=None,
+                 delitem_hook=None, reverse_hook=None, sort_hook=None,
+                 clear_hook=None):
         if init_val is None:
-            init_val = []
-        super(ClassList, self).__init__(init_val)
-        self.elm = elm
+            super(HookList, self).__init__()
+        else:
+            super(HookList, self).__init__(init_val)
+        self.add_hook = add_hook
+        self.extend_hook = extend_hook
+        self.insert_hook = insert_hook
+        self.remove_hook = remove_hook
+        self.pop_hook = pop_hook
+        self.delitem_hook = delitem_hook
+        self.reverse_hook = reverse_hook
+        self.sort_hook = sort_hook
+        self.clear_hook = clear_hook
+
+    def _raw_append(self, txt):
+        super(HookList, self).append(txt)
 
     def append(self, txt):
-        super(ClassList, self).append(txt)
-        self.elm._classList_add(txt)
+        if callable(self.add_hook):
+            if self.add_hook(txt):
+                super(HookList, self).append(txt)
+        else:
+            super(HookList, self).append(txt)
 
     def add(self, txt):
         self.append(txt)
 
+    def _raw_extend(self, lst):
+        super(HookList, self).extend(lst)
+
     def extend(self, lst):
-        super(ClassList, self).extend(lst)
-        self.elm._classList_extend(lst)
+        if callable(self.extend_hook):
+            if self.extend_hook(lst):
+                super(HookList, self).extend(lst)
+        else:
+            super(HookList, self).extend(lst)
+
+    def _raw_insert(self, index, p_object):
+        super(HookList, self).insert(index, p_object)
 
     def insert(self, index, p_object):
-        super(ClassList, self).insert(index, p_object)
-        self.elm._classList_add(p_object)
+        if callable(self.insert_hook):
+            if self.insert_hook(index, p_object):
+                super(HookList, self).insert(index, p_object)
+        else:
+            super(HookList, self).insert(index, p_object)
+
+    def _raw_remove(self, txt):
+        super(HookList, self).remove(txt)
 
     def remove(self, txt):
-        super(ClassList, self).remove(txt)
-        self.elm._classList_remove(txt)
+        if callable(self.remove_hook):
+            if self.remove_hook(txt):
+                super(HookList, self).remove(txt)
+        else:
+            super(HookList, self).remove(txt)
+
+    def _raw_pop(self, idx=None):
+        if idx is None:
+            return super(HookList, self).pop()
+        else:
+            return super(HookList, self).pop(idx)
+
+    def pop(self, idx=None):
+        if callable(self.pop_hook):
+            res, elm = self.pop_hook(idx)
+            if res:
+                elm = self._raw_pop(idx)
+            return elm
+        else:
+            return self._raw_pop(idx)
+
+    def _raw_delitem(self, idx):
+        super(HookList, self).__delitem__(idx)
+
+    def __delitem__(self, idx):
+        if callable(self.delitem_hook):
+            if self.delitem_hook(idx):
+                super(HookList, self).__delitem__(idx)
+        else:
+            super(HookList, self).__delitem__(idx)
+
+    # delslice is python2 only
+    def _raw_delslice(self, i=None, j=None):
+        super(HookList, self).__delslice__(i, j)
+
+    def __delslice__(self, i=None, j=None):
+        if callable(self.delitem_hook):
+            if self.delitem_hook(slice(i, j)):
+                super(HookList, self).__delslice__(i, j)
+        else:
+            super(HookList, self).__delslice__(i, j)
+
+    def _raw_reverse(self):
+        super(HookList, self).reverse()
+
+    def reverse(self):
+        if callable(self.reverse_hook):
+            if self.reverse_hook():
+                super(HookList, self).reverse()
+        else:
+            super(HookList, self).reverse()
+
+    def _raw_sort(self, key=None, reverse=False):
+        super(HookList, self).sort(key=key, reverse=reverse)
+
+    def sort(self, key=None, reverse=False):
+        if callable(self.sort_hook):
+            if self.sort_hook(key, reverse):
+                super(HookList, self).sort(key=key, reverse=reverse)
+        else:
+            super(HookList, self).sort(key=key, reverse=reverse)
 
     def contains(self, txt):
         return txt in self
@@ -60,16 +150,60 @@ class ClassList(list):
         else:
             self.append(txt)
 
+    def _raw_clear(self):
+        if sys.version_info.major == 2:
+            self._raw_delslice(0, len(self))
+        else:
+            self._raw_delitem(slice(None, None))
+
     def clear(self):
-        # super(ClassList, self).clear() # python3 only
-        del self[:]
-        self.elm._classList_clear()
+        if callable(self.clear_hook):
+            if self.clear_hook():
+                self._raw_clear()
+        else:
+            self._raw_clear()
+
+
+class ChildList(HookList):
+    def __init__(self, elm, init_val=None):
+        if init_val is None:
+            init_val = []
+        super(ChildList, self).__init__(
+            init_val=init_val,
+            add_hook=elm._child_add,
+            extend_hook=elm._child_extend,
+            insert_hook=elm._child_insert,
+            remove_hook=elm._child_remove,
+            pop_hook=elm._child_pop,
+            delitem_hook=elm._child_delitem,
+            reverse_hook=elm._child_reverse,
+            sort_hook=elm._child_sort,
+            clear_hook=elm._child_clear,
+        )
+
+
+class ClassList(HookList):
+    # element.class property class
+    def __init__(self, elm, init_val=None):
+        if init_val is None:
+            init_val = []
+        super(ClassList, self).__init__(
+            init_val=init_val,
+            add_hook=elm._classList_add,
+            extend_hook=elm._classList_extend,
+            insert_hook=elm._classList_insert,
+            remove_hook=elm._classList_remove,
+            pop_hook=elm._classList_pop,
+            delitem_hook=elm._classList_delitem,
+            clear_hook=elm._classList_clear,
+        )
 
     def _set_class_name(self, txt):
-        # classNameをセットされた場合、差分データはそのまま送り、classListは分解して格納する。self.elm....呼び出しは不要
-        del self[:]
+        # When className is set, diffdat is sent as it is, and classList is decomposed and stored. no need to call self.elm._classList_xxx
+        self._raw_clear()
         lst = [x for x in txt.split(' ') if 0 < len(x)]
-        super(ClassList, self).extend(lst)
+        super(ClassList, self)._raw_extend(lst)
+
 
 class Style(dict):
     """
@@ -133,6 +267,17 @@ class Style(dict):
     def __delattr__(self, key):
         self.__delitem__(key)
 
+    def pop(self, key, *args):
+        if key in self:
+            val = self[key]
+            self.__delitem__(key)
+            return val
+        else:
+            if 0 < len(args):
+                return args[0]
+            else:
+                raise TypeError
+
     def clear(self):
         if 0 < len(self):
             super(Style, self).clear()
@@ -179,12 +324,13 @@ class Element(object):
         self.parent = None
         self.eventlisteners = []
         self.attributes = {}
-        self.child = []
+        self._child = ChildList(self)
         self._classList = ClassList(self)
         self._style = Style(self)
         self._onclick = None
         self._onchange = None
         self._in_init_ = False
+        self._on = 0 # to sort child
         #self.onblur = None
         #self.onfocus = None
         #self.onclose = None
@@ -213,10 +359,11 @@ class Element(object):
         #self.onmousemove = None
 
     # dif_dat除外
-    dif_excepts = ['_in_init_', 'class', 'classList', 'style',
+    dif_excepts = ['_in_init_', '_on', 'class', 'classList', 'style',
                    'parent', 'document', 'onclick', '_onclick',
-                   'child',
+                   '_child',
                    'onchange', '_onchange',]
+    ser_excepts = ['_in_init_', '_on', 'parent', 'document',]
 
     def pre_setattr(self, key, value):
         if 'document' in self.__dict__:
@@ -253,6 +400,17 @@ class Element(object):
         if orgid in objdic:
             del(objdic[orgid])
         objdic[txt] = self
+
+    @property
+    def child(self):
+        return self._child
+
+    @child.setter
+    def child(self, lst):
+        if 0 < len(self._child):
+            self._child.clear()
+        for elm in lst:
+            self.appendChild(elm)
 
     @property
     def className(self):
@@ -294,23 +452,23 @@ class Element(object):
         self.document.add_diff({_OBJKEY_: self._id, 'onchange': name})
 
     def removeChild(self, elm):
-        if elm not in self.child:
+        if elm not in self._child:
             raise ValueError('not child')
         self.document.add_diff({_OBJKEY_: self._id, 'removeChild': elm.id})
         elm.parent = None
-        self.child.remove(elm)
+        self._child._raw_remove(elm)
 
     def appendChild(self, elm):
         if elm.parent is not None:
             elm.parent.removeChild(elm)
-        self.child.append(elm)
+        self.child._raw_append(elm)
         elm.parent = self
         self.document.add_diff({_OBJKEY_: self._id, 'appendChild': elm.id})
         # check child recursively
-        if 0 == len(elm.child):
+        if 0 == len(elm._child):
             return
         que = collections.deque()
-        for child in elm.child:
+        for child in elm._child:
             que.append((elm, child))
         while True:
             try:
@@ -334,12 +492,19 @@ class Element(object):
             self.appendChild(new_elm)
         else:
             pos = self.child.index(ref_elm)
-            self.child.insert(pos, new_elm)
+            self.child._raw_insert(pos, new_elm)
             new_elm.parent = self
-            self.document.add_diff({_OBJKEY_: self._id, 'insertBefore': [new_elm, ref_elm]})
+            self.document.add_diff({_OBJKEY_: self._id, '_insertBefore': [new_elm._id, ref_elm._id]})
 
-    def replaceChild(self, newelm, oldelm):
-        raise NotImplemented
+    def replaceChild(self, new_elm, old_elm):
+        if old_elm is None:
+            self.appendChild(new_elm)
+        else:
+            pos = self.child.index(old_elm)
+            self.child._raw_insert(pos, new_elm)
+            self.child._raw_remove(old_elm)
+            new_elm.parent = self
+            self.document.add_diff({_OBJKEY_: self._id, '_replaceChild': [new_elm._id, old_elm._id]})
 
     def getAttribute(self, name):
         if 'style' == name:
@@ -393,9 +558,8 @@ class Element(object):
             dic = obj.__dict__.copy()
             # delete reference to other elements to avoid circular reference
             # 他のelementへの参照を含めるてしまうと循環参照エラーが発生するため削除する
-            del (dic['document'])
-            del (dic['parent'])
-            del (dic['_in_init_'])
+            for nm in Element.ser_excepts:
+                del (dic[nm])
             items = list(dic.items())
             for k, v in items:
                 if v is None:
@@ -418,26 +582,95 @@ class Element(object):
             return name
         raise TypeError(repr(obj) + " is not serializable!")
 
+    def _child_add(self, elm):
+        self.appendChild(elm)
+        return False
+
+    def _child_insert(self, index, elm):
+        self.insertBefore(self.child[index], elm)
+        return False
+
+    def _child_extend(self, lst):
+        for elm in lst:
+            self.appendChild(elm)
+        return False
+
+    def _child_remove(self, elm):
+        self.removeChild(elm)
+        return False
+
+    def _child_pop(self, idx):
+        elm = None
+        if 0 <= idx < len(self._child):
+            elm = self._child[idx]
+            self.removeChild(elm)
+        return False, elm
+
+    def _child_delitem(self, idx):
+        cnt = len(self._child)
+        if isinstance(idx, slice):
+            if (0 <= idx.start < cnt) and (0 <= idx.stop < cnt):
+                lst = list([self._child[j] for j in range(idx.start, idx.stop, idx.step)])
+                for elm in lst:
+                    self.removeChild(elm)
+        elif isinstance(idx, int):
+            if 0 <= idx < cnt:
+                self.removeChild(self._child[idx])
+        return False
+
+    def _child_reverse(self):
+        self.document.add_diff({_OBJKEY_: self._id, '_reverseChild': True})
+        return True
+
+    def _child_sort(self, key=None, reverse=False):
+        for j, elm in enumerate(self.child):
+            elm._on = j
+        self.child._raw_sort(key=key, reverse=reverse)
+        ordr = list([elm._on for elm in self.child])
+        self.document.add_diff({_OBJKEY_: self._id, '_sortChild': ordr})
+        return False
+
+    def _child_clear(self):
+        self.document.add_diff({_OBJKEY_: self._id, '_clearChild': True})
+        return True
+
     def _classList_add(self, txt):
         self.document.add_diff({_OBJKEY_: self._id, 'addClass': [txt, ]})
+        return True
+
+    def _classList_insert(self, index, txt):
+        self.document.add_diff({_OBJKEY_: self._id, 'addClass': [txt, ]})
+        return True
 
     def _classList_extend(self, lst):
         self.document.add_diff({_OBJKEY_: self._id, 'addClass': lst})
+        return True
 
     def _classList_remove(self, txt):
         self.document.add_diff({_OBJKEY_: self._id, 'removeClass': [txt, ]})
+        return True
+
+    def _classList_pop(self, idx):
+        raise NotImplemented    # todo
+
+    def _classList_delitem(self, idx):
+        raise NotImplemented    # todo
 
     def _classList_clear(self):
         self.document.add_diff({_OBJKEY_: self._id, 'clearClass': True})
+        return True
 
     def _style_set(self, key, value):
         self.document.add_diff({_OBJKEY_: self._id, 'setStyle': {key: value}})
+        return True
 
     def _style_delete(self, key):
         self.document.add_diff({_OBJKEY_: self._id, 'deleteStyle': [key, ]})
+        return True
 
     def _style_clear(self):
         self.document.add_diff({_OBJKEY_: self._id, 'clearStyle': True})
+        return True
 
 
 class Document(object):
@@ -551,9 +784,9 @@ class Document(object):
         self.add_handler(elm, handler)
         if child is not None:
             if isinstance(child, list) or isinstance(child, tuple):
-                elm.child = child
+                elm._child = ChildList(child)
             else:
-                elm.child = [child, ]
+                elm._child = ChildList([child, ])
         return elm
 
     def add_handler(self, elm, handler):

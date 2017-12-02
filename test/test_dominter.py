@@ -8,6 +8,299 @@ import dominter.dom as domdom
 
 
 class TestDominter(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(TestDominter, self).__init__(*args, **kwargs)
+        self.hl_return_val = True
+        self.hl_return_pop = 'pop return'
+        self.hl_add_elm = None
+        self.hl_extend_lst = None
+        self.hl_insert_idx = -1
+        self.hl_insert_elm = None
+        self.hl_remove_elm = None
+        self.hl_pop_idx = -1
+        self.hl_delitem_idx = -1
+        self.hl_reverse_cnt = 0
+        self.hl_sort_cnt = 0
+        self.hl_sort_key = None
+        self.hl_sort_reverse = None
+        self.hl_clear_cnt = 0
+
+    def hl_add_hook(self, elm):
+        self.hl_add_elm = elm
+        return self.hl_return_val
+
+    def hl_extend_hook(self, lst):
+        self.hl_extend_lst = lst
+        return self.hl_return_val
+
+    def hl_inserted_hook(self, idx, elm):
+        self.hl_insert_idx = idx
+        self.hl_insert_elm = elm
+        return self.hl_return_val
+
+    def hl_remove_hook(self, elm):
+        self.hl_remove_elm = elm
+        return self.hl_return_val
+
+    def hl_pop_hook(self, idx):
+        self.hl_pop_idx = idx
+        return self.hl_return_val, self.hl_return_pop
+
+    def hl_delitem_hook(self, idx):
+        self.hl_delitem_idx = idx
+        return self.hl_return_val
+
+    def hl_reverse_hook(self):
+        self.hl_reverse_cnt += 1
+        return self.hl_return_val
+
+    def hl_sort_hook(self, key, reverse):
+        self.hl_sort_cnt += 1
+        self.hl_sort_key = key
+        self.hl_sort_reverse = reverse
+        return self.hl_return_val
+
+    def hl_clear_hook(self):
+        self.hl_clear_cnt += 1
+        return self.hl_return_val
+
+    def test_HookList(self):
+        hl = domdom.HookList(init_val=None,
+                             add_hook=self.hl_add_hook,
+                             extend_hook=self.hl_extend_hook,
+                             insert_hook=self.hl_inserted_hook,
+                             remove_hook=self.hl_remove_hook,
+                             pop_hook=self.hl_pop_hook,
+                             delitem_hook=self.hl_delitem_hook,
+                             reverse_hook=self.hl_reverse_hook,
+                             sort_hook=self.hl_sort_hook,
+                             clear_hook=self.hl_clear_hook,)
+        # append
+        self.hl_return_val = True
+        hl._raw_append('test1')
+        self.assertEqual(self.hl_add_elm, None)
+        hl.append('test2')
+        self.assertEqual(self.hl_add_elm, 'test2')
+        self.assertEqual(hl, ['test1', 'test2'])
+        self.hl_return_val = False
+        hl.append('test3')
+        self.assertEqual(self.hl_add_elm, 'test3')
+        self.assertEqual(hl, ['test1', 'test2'])
+        # add
+        hl.add('test4')
+        self.assertEqual(self.hl_add_elm, 'test4')
+        self.assertEqual(hl, ['test1', 'test2'])
+        self.hl_return_val = True
+        hl.add('test5')
+        self.assertEqual(self.hl_add_elm, 'test5')
+        self.assertEqual(hl, ['test1', 'test2', 'test5'])
+        # extend
+        hl._raw_extend(['test6', 'test7'])
+        self.assertEqual(self.hl_extend_lst, None)
+        self.assertEqual(hl, ['test1', 'test2', 'test5', 'test6', 'test7'])
+        hl.extend(['test8', ])
+        self.assertEqual(self.hl_extend_lst, ['test8', ])
+        self.assertEqual(hl, ['test1', 'test2', 'test5', 'test6', 'test7', 'test8'])
+        self.hl_return_val = False
+        hl.extend(['test9', 'test10', 'test11', ])
+        self.assertEqual(self.hl_extend_lst, ['test9', 'test10', 'test11', ])
+        self.assertEqual(hl, ['test1', 'test2', 'test5', 'test6', 'test7', 'test8'])
+        # insert
+        hl._raw_insert(1, 'test1.5')
+        self.assertEqual(self.hl_insert_idx, -1)
+        self.assertEqual(self.hl_insert_elm, None)
+        self.assertEqual(hl, ['test1', 'test1.5', 'test2', 'test5', 'test6', 'test7', 'test8'])
+        hl.insert(2, 'test1.8')
+        self.assertEqual(self.hl_insert_idx, 2)
+        self.assertEqual(self.hl_insert_elm, 'test1.8')
+        self.assertEqual(hl, ['test1', 'test1.5', 'test2', 'test5', 'test6', 'test7', 'test8'])
+        self.hl_return_val = True
+        hl.insert(0, 'test0.5')
+        self.assertEqual(self.hl_insert_idx, 0)
+        self.assertEqual(self.hl_insert_elm, 'test0.5')
+        self.assertEqual(hl, ['test0.5', 'test1', 'test1.5', 'test2', 'test5', 'test6', 'test7', 'test8'])
+        # remove
+        hl._raw_remove('test8')
+        self.assertEqual(self.hl_remove_elm, None)
+        self.assertEqual(hl, ['test0.5', 'test1', 'test1.5', 'test2', 'test5', 'test6', 'test7', ])
+        hl.remove('test1')
+        self.assertEqual(self.hl_remove_elm, 'test1')
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test2', 'test5', 'test6', 'test7', ])
+        self.hl_return_val = False
+        hl.remove('test2')
+        self.assertEqual(self.hl_remove_elm, 'test2')
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test2', 'test5', 'test6', 'test7', ])
+        # pop
+        elm = hl._raw_pop(2)
+        self.assertEqual(elm, 'test2')
+        self.assertEqual(self.hl_pop_idx, -1)
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test5', 'test6', 'test7', ])
+        elm = hl.pop(0)
+        self.assertEqual(elm, self.hl_return_pop)
+        self.assertEqual(self.hl_pop_idx, 0)
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test5', 'test6', 'test7', ])
+        self.hl_return_val = True
+        elm = hl.pop(3)
+        self.assertEqual(elm, 'test6')
+        self.assertEqual(self.hl_pop_idx, 3)
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test5', 'test7', ])
+        # delitem
+        hl._raw_delitem(3)
+        self.assertEqual(self.hl_delitem_idx, -1)
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test5', ])
+        del hl[1]
+        self.assertEqual(self.hl_delitem_idx, 1)
+        self.assertEqual(hl, ['test0.5', 'test5', ])
+        hl.extend(['test6', 'test7', 'test8', 'test9'])
+        del hl[0:3]
+        self.assertEqual(self.hl_delitem_idx, slice(0, 3, None))
+        self.assertEqual(hl, ['test7', 'test8', 'test9'])
+        self.hl_return_val = False
+        del hl[1]
+        self.assertEqual(self.hl_delitem_idx, 1)
+        self.assertEqual(hl, ['test7', 'test8', 'test9'])
+        del hl[0:3]
+        self.assertEqual(self.hl_delitem_idx, slice(0, 3, None))
+        self.assertEqual(hl, ['test7', 'test8', 'test9'])
+        # reverse
+        hl._raw_reverse()
+        self.assertEqual(self.hl_reverse_cnt, 0)
+        self.assertEqual(hl, ['test9', 'test8', 'test7'])
+        hl.reverse()
+        self.assertEqual(self.hl_reverse_cnt, 1)
+        self.assertEqual(hl, ['test9', 'test8', 'test7'])
+        self.hl_return_val = True
+        hl.reverse()
+        self.assertEqual(self.hl_reverse_cnt, 2)
+        self.assertEqual(hl, ['test7', 'test8', 'test9'])
+        # sort
+        hl.extend(['test2', 'Test4', 'Test3'])
+        hl._raw_sort(reverse=True)
+        self.assertEqual(self.hl_sort_cnt, 0)
+        self.assertEqual(self.hl_sort_key, None)
+        self.assertEqual(self.hl_sort_reverse, None)
+        self.assertEqual(hl, ['test9', 'test8', 'test7', 'test2', 'Test4', 'Test3'])
+        hl._raw_sort()
+        self.assertEqual(self.hl_sort_cnt, 0)
+        self.assertEqual(self.hl_sort_key, None)
+        self.assertEqual(self.hl_sort_reverse, None)
+        self.assertEqual(hl, ['Test3', 'Test4', 'test2', 'test7', 'test8', 'test9'])
+        hl._raw_sort(key=str.lower)
+        self.assertEqual(self.hl_sort_cnt, 0)
+        self.assertEqual(self.hl_sort_key, None)
+        self.assertEqual(self.hl_sort_reverse, None)
+        self.assertEqual(hl, ['test2', 'Test3', 'Test4', 'test7', 'test8', 'test9'])
+        hl.sort(reverse=True)
+        self.assertEqual(self.hl_sort_cnt, 1)
+        self.assertEqual(self.hl_sort_key, None)
+        self.assertEqual(self.hl_sort_reverse, True)
+        self.assertEqual(hl, ['test9', 'test8', 'test7', 'test2', 'Test4', 'Test3'])
+        hl.sort()
+        self.assertEqual(self.hl_sort_cnt, 2)
+        self.assertEqual(self.hl_sort_key, None)
+        self.assertEqual(self.hl_sort_reverse, False)
+        self.assertEqual(hl, ['Test3', 'Test4', 'test2', 'test7', 'test8', 'test9'])
+        hl.sort(key=str.lower)
+        self.assertEqual(self.hl_sort_cnt, 3)
+        self.assertEqual(self.hl_sort_key, str.lower)
+        self.assertEqual(self.hl_sort_reverse, False)
+        self.assertEqual(hl, ['test2', 'Test3', 'Test4', 'test7', 'test8', 'test9'])
+        self.hl_return_val = False
+        hl.sort(reverse=True)
+        self.assertEqual(self.hl_sort_cnt, 4)
+        self.assertEqual(self.hl_sort_key, None)
+        self.assertEqual(self.hl_sort_reverse, True)
+        self.assertEqual(hl, ['test2', 'Test3', 'Test4', 'test7', 'test8', 'test9'])
+        hl.sort()
+        self.assertEqual(self.hl_sort_cnt, 5)
+        self.assertEqual(self.hl_sort_key, None)
+        self.assertEqual(self.hl_sort_reverse, False)
+        self.assertEqual(hl, ['test2', 'Test3', 'Test4', 'test7', 'test8', 'test9'])
+        hl.sort(key=str.lower)
+        self.assertEqual(self.hl_sort_cnt, 6)
+        self.assertEqual(self.hl_sort_key, str.lower)
+        self.assertEqual(self.hl_sort_reverse, False)
+        self.assertEqual(hl, ['test2', 'Test3', 'Test4', 'test7', 'test8', 'test9'])
+        # contains
+        self.assertTrue(hl.contains('test2'))
+        self.assertTrue(hl.contains('Test3'))
+        self.assertTrue(hl.contains('Test4'))
+        self.assertTrue(hl.contains('test7'))
+        self.assertTrue(hl.contains('test8'))
+        self.assertTrue(hl.contains('test9'))
+        self.assertFalse(hl.contains('Test2'))
+        # toggle
+        self.hl_return_val = True
+        hl.toggle('Test4')
+        self.assertEqual(hl, ['test2', 'Test3', 'test7', 'test8', 'test9'])
+        hl.toggle('Test4')
+        self.assertEqual(hl, ['test2', 'Test3', 'test7', 'test8', 'test9', 'Test4'])
+        # clear
+        self.hl_return_val = False
+        hl._raw_clear()
+        self.assertEqual(hl, [])
+        hl._raw_extend(['test2', 'Test3', 'test7', 'test8', 'test9', 'Test4'])
+        self.assertEqual(self.hl_clear_cnt, 0)
+        hl.clear()
+        self.assertEqual(self.hl_clear_cnt, 1)
+        self.assertEqual(hl, ['test2', 'Test3', 'test7', 'test8', 'test9', 'Test4'])
+        self.hl_return_val = True
+        hl.clear()
+        self.assertEqual(self.hl_clear_cnt, 2)
+        self.assertEqual(hl, [])
+
+        # init_val
+        hl = domdom.HookList(init_val=[1, 2, 3, 4, ])
+        self.assertEqual(hl, [1, 2, 3, 4, ])
+        hl = domdom.HookList(init_val=None)
+        self.hl_return_val = False
+        # append
+        hl._raw_append('test1')
+        hl.append('test2')
+        self.assertEqual(hl, ['test1', 'test2'])
+        # add
+        hl.add('test4')
+        self.assertEqual(hl, ['test1', 'test2', 'test4'])
+        # extend
+        hl._raw_extend(['test6', 'test7'])
+        hl.extend(['test8', ])
+        self.assertEqual(hl, ['test1', 'test2', 'test4', 'test6', 'test7', 'test8'])
+        # insert
+        hl._raw_insert(1, 'test1.5')
+        hl.insert(0, 'test0.5')
+        self.assertEqual(hl, ['test0.5', 'test1', 'test1.5', 'test2', 'test4', 'test6', 'test7', 'test8'])
+        # remove
+        hl._raw_remove('test8')
+        hl.remove('test1')
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test2', 'test4', 'test6', 'test7', ])
+        # pop
+        elm = hl._raw_pop(2)
+        self.assertEqual(elm, 'test2')
+        elm = hl.pop(3)
+        self.assertEqual(elm, 'test6')
+        self.assertEqual(hl, ['test0.5', 'test1.5', 'test4', 'test7', ])
+        # delitem
+        hl._raw_delitem(3)
+        del hl[1]
+        self.assertEqual(hl, ['test0.5', 'test4', ])
+        hl.extend(['test6', 'test7', 'test8', 'test9'])
+        del hl[0:3]
+        self.assertEqual(hl, ['test7', 'test8', 'test9'])
+        # reverse
+        hl._raw_reverse()
+        self.assertEqual(hl, ['test9', 'test8', 'test7'])
+        hl.reverse()
+        self.assertEqual(hl, ['test7', 'test8', 'test9'])
+        # sort
+        hl.extend(['test2', 'Test4', 'Test3'])
+        hl._raw_sort(reverse=True)
+        self.assertEqual(hl, ['test9', 'test8', 'test7', 'test2', 'Test4', 'Test3'])
+        hl._raw_sort()
+        self.assertEqual(hl, ['Test3', 'Test4', 'test2', 'test7', 'test8', 'test9'])
+        hl._raw_sort(key=str.lower)
+        self.assertEqual(hl, ['test2', 'Test3', 'Test4', 'test7', 'test8', 'test9'])
+
+
     def test_ClassList(self):
         win = Window()
         document = win.document
