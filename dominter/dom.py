@@ -322,15 +322,15 @@ class Element(object):
         self.tagName = tag
         self.name = None
         self.parent = None
-        self.eventlisteners = []
+        self._eventlisteners = []
         self.attributes = {}
-        self._child = ChildList(self)
+        self._childList = ChildList(self)
         self._classList = ClassList(self)
         self._style = Style(self)
         self._onclick = None
         self._onchange = None
         self._in_init_ = False
-        self._on = 0 # to sort child
+        self._on = 0 # to sort childList
         #self.onblur = None
         #self.onfocus = None
         #self.onclose = None
@@ -359,41 +359,31 @@ class Element(object):
         #self.onmousemove = None
 
     # dif_dat除外
-    dif_excepts = ['_in_init_', '_on', 'class', 'classList', 'style',
-                   'parent', 'document', 'onclick', '_onclick',
-                   '_child',
-                   'onchange', '_onchange',]
-    ser_excepts = ['_in_init_', '_on', 'parent', 'document',]
+    dif_excepts = ['_in_init_', '_on', 'classList', 'style',
+                   'childList', '_childList',
+                   'parent', 'document',
+                   'onclick', '_onclick',
+                   'onchange', '_onchange', ]
+    ser_excepts = ['_in_init_', '_on', 'parent', 'document', ]
 
-    def pre_setattr(self, key, value):
+    def _pre_setattr(self, key, value):
         if 'document' in self.__dict__:
             if (not self._in_init_) and (key not in self.dif_excepts):
                 self.document.add_diff({_OBJKEY_: self._id, key: value})
 
     def __setattr__(self, key, value):
-        self.pre_setattr(key, value)
-        if 'id' == key:
-            self.set_id(value)
-        elif 'className' == key:
-            self.set_class_name(value)
-        elif 'class' == key:
-            self.set_class_name(value)
-        elif 'classList' == key:
-            raise TypeError('readonly')
-        elif 'style' == key:
-            self._style.cssText = value
-        elif 'onclick' == key:
-            self.set_onclick(value)
-        elif 'onchange' == key:
-            self.set_onchange(value)
-        else:
-            super(Element, self).__setattr__(key, value)
+        self._pre_setattr(key, value)
+        super(Element, self).__setattr__(key, value)
 
     @property
     def id(self):
         return self._id
 
-    def set_id(self, txt):
+    @id.setter
+    def id(self, value):
+        self._set_id(value)
+
+    def _set_id(self, txt):
         orgid = self._id
         self.__dict__['_id'] = txt
         objdic = self.document.obj_dic
@@ -402,13 +392,13 @@ class Element(object):
         objdic[txt] = self
 
     @property
-    def child(self):
-        return self._child
+    def childList(self):
+        return self._childList
 
-    @child.setter
-    def child(self, lst):
-        if 0 < len(self._child):
-            self._child.clear()
+    @childList.setter
+    def childList(self, lst):
+        if 0 < len(self._childList):
+            self._childList.clear()
         for elm in lst:
             self.appendChild(elm)
 
@@ -416,7 +406,11 @@ class Element(object):
     def className(self):
         return ' '.join(self._classList)
 
-    def set_class_name(self, txt):
+    @className.setter
+    def className(self, value):
+        self._set_class_name(value)
+
+    def _set_class_name(self, txt):
         classlist = self.__dict__['_classList']
         classlist._set_class_name(txt)
 
@@ -424,9 +418,17 @@ class Element(object):
     def classList(self):
         return self._classList
 
+    @classList.setter
+    def classList(self, value):
+        raise TypeError('readonly')
+
     @property
     def style(self):
         return self._style
+
+    @style.setter
+    def style(self, value):
+        self._style.cssText = value
 
     def addhandler(self, fnc):
         name = repr(fnc)
@@ -437,7 +439,11 @@ class Element(object):
     def onclick(self):
         return self._onclick
 
-    def set_onclick(self, fnc):
+    @onclick.setter
+    def onclick(self, value):
+        self._set_onclick(value)
+
+    def _set_onclick(self, fnc):
         self.__dict__['_onclick'] = fnc
         name = self.addhandler(fnc)
         self.document.add_diff({_OBJKEY_: self.id, 'onclick': name})
@@ -446,40 +452,44 @@ class Element(object):
     def onchange(self):
         return self._onchange
 
-    def set_onchange(self, fnc):
+    @onchange.setter
+    def onchange(self, value):
+        self._set_onchange(value)
+
+    def _set_onchange(self, fnc):
         self.__dict__['_onchange'] = fnc
         name = self.addhandler(fnc)
         self.document.add_diff({_OBJKEY_: self._id, 'onchange': name})
 
     def removeChild(self, elm):
-        if elm not in self._child:
+        if elm not in self._childList:
             raise ValueError('not child')
-        self.document.add_diff({_OBJKEY_: self._id, 'removeChild': elm.id})
+        self.document.add_diff({_OBJKEY_: self._id, '_removeChild': elm.id})
         elm.parent = None
-        self._child._raw_remove(elm)
+        self._childList._raw_remove(elm)
 
     def appendChild(self, elm):
         if elm.parent is not None:
             elm.parent.removeChild(elm)
-        self.child._raw_append(elm)
+        self.childList._raw_append(elm)
         elm.parent = self
-        self.document.add_diff({_OBJKEY_: self._id, 'appendChild': elm.id})
-        # check child recursively
-        if 0 == len(elm._child):
+        self.document.add_diff({_OBJKEY_: self._id, '_appendChild': elm.id})
+        # check childList recursively
+        if 0 == len(elm._childList):
             return
         que = collections.deque()
-        for child in elm._child:
-            que.append((elm, child))
+        for chd in elm._childList:
+            que.append((elm, chd))
         while True:
             try:
-                parent, child = que.popleft()
+                parent, chd = que.popleft()
             except IndexError:
                 break
-            if child.parent is None:
-                child.parent = parent
-                self.document.add_diff({_OBJKEY_: parent._id, 'appendChild': child.id})
-            for gson in child.child:
-                que.append((child, gson))
+            if chd.parent is None:
+                chd.parent = parent
+                self.document.add_diff({_OBJKEY_: parent._id, '_appendChild': chd.id})
+            for gson in chd.childList:
+                que.append((chd, gson))
 
     def insertBefore(self, new_elm, ref_elm):
         """
@@ -491,8 +501,8 @@ class Element(object):
         if ref_elm is None:
             self.appendChild(new_elm)
         else:
-            pos = self.child.index(ref_elm)
-            self.child._raw_insert(pos, new_elm)
+            pos = self.childList.index(ref_elm)
+            self.childList._raw_insert(pos, new_elm)
             new_elm.parent = self
             self.document.add_diff({_OBJKEY_: self._id, '_insertBefore': [new_elm._id, ref_elm._id]})
 
@@ -500,9 +510,13 @@ class Element(object):
         if old_elm is None:
             self.appendChild(new_elm)
         else:
-            pos = self.child.index(old_elm)
-            self.child._raw_insert(pos, new_elm)
-            self.child._raw_remove(old_elm)
+            if new_elm.parent is not None:
+                new_elm.parent.childList._raw_remove(new_elm)
+                new_elm.parent = None
+            pos = self.childList.index(old_elm)
+            self.childList._raw_remove(old_elm)
+            old_elm.parent = None
+            self.childList._raw_insert(pos, new_elm)
             new_elm.parent = self
             self.document.add_diff({_OBJKEY_: self._id, '_replaceChild': [new_elm._id, old_elm._id]})
 
@@ -522,7 +536,7 @@ class Element(object):
             self.className = value
         else:
             self.attributes[name] = value
-            self.document.add_diff({_OBJKEY_: self._id, 'setAttributes': {name: value}})
+            self.document.add_diff({_OBJKEY_: self._id, '_setAttributes': {name: value}})
 
     def removeAttribute(self, name):
         if 'style' == name:
@@ -531,18 +545,18 @@ class Element(object):
             self.className = ''
         elif name in self.attributes.keys():
             del(self.attributes[name])
-            self.document.add_diff({_OBJKEY_: self._id, 'removeAttributes': [name, ]})
+            self.document.add_diff({_OBJKEY_: self._id, '_removeAttributes': [name, ]})
 
     def addEventListener(self, type_, listener):
-        self.eventlisteners.append((type_, listener))
-        self.document.add_diff({_OBJKEY_: self._id, 'addEventListener': [listener, ]})
+        self._eventlisteners.append((type_, listener))
+        self.document.add_diff({_OBJKEY_: self._id, '_addEventListener': [listener, ]})
         self.addhandler(listener)
 
     def removeEventListener(self, type_, listener):
         tpl = (type_, listener)
-        if tpl in self.eventlisteners:
-            self.eventlisteners.remove(tpl)
-            self.document.add_diff({_OBJKEY_: self._id, 'removeEventListener': [listener, ]})
+        if tpl in self._eventlisteners:
+            self._eventlisteners.remove(tpl)
+            self.document.add_diff({_OBJKEY_: self._id, '_removeEventListener': [listener, ]})
             name = repr(listener)
             del(self.document.handlers[name])
 
@@ -587,7 +601,7 @@ class Element(object):
         return False
 
     def _child_insert(self, index, elm):
-        self.insertBefore(self.child[index], elm)
+        self.insertBefore(self.childList[index], elm)
         return False
 
     def _child_extend(self, lst):
@@ -601,21 +615,21 @@ class Element(object):
 
     def _child_pop(self, idx):
         elm = None
-        if 0 <= idx < len(self._child):
-            elm = self._child[idx]
+        if 0 <= idx < len(self._childList):
+            elm = self._childList[idx]
             self.removeChild(elm)
         return False, elm
 
     def _child_delitem(self, idx):
-        cnt = len(self._child)
+        cnt = len(self._childList)
         if isinstance(idx, slice):
             if (0 <= idx.start < cnt) and (0 <= idx.stop < cnt):
-                lst = list([self._child[j] for j in range(idx.start, idx.stop, idx.step)])
+                lst = list([self._childList[j] for j in range(idx.start, idx.stop, idx.step)])
                 for elm in lst:
                     self.removeChild(elm)
         elif isinstance(idx, int):
             if 0 <= idx < cnt:
-                self.removeChild(self._child[idx])
+                self.removeChild(self._childList[idx])
         return False
 
     def _child_reverse(self):
@@ -623,31 +637,33 @@ class Element(object):
         return True
 
     def _child_sort(self, key=None, reverse=False):
-        for j, elm in enumerate(self.child):
+        for j, elm in enumerate(self.childList):
             elm._on = j
-        self.child._raw_sort(key=key, reverse=reverse)
-        ordr = list([elm._on for elm in self.child])
+        self.childList._raw_sort(key=key, reverse=reverse)
+        ordr = list([elm._on for elm in self.childList])
         self.document.add_diff({_OBJKEY_: self._id, '_sortChild': ordr})
         return False
 
     def _child_clear(self):
         self.document.add_diff({_OBJKEY_: self._id, '_clearChild': True})
+        for elm in self.childList:
+            elm.parent = None
         return True
 
     def _classList_add(self, txt):
-        self.document.add_diff({_OBJKEY_: self._id, 'addClass': [txt, ]})
+        self.document.add_diff({_OBJKEY_: self._id, '_addClass': [txt, ]})
         return True
 
     def _classList_insert(self, index, txt):
-        self.document.add_diff({_OBJKEY_: self._id, 'addClass': [txt, ]})
+        self.document.add_diff({_OBJKEY_: self._id, '_addClass': [txt, ]})
         return True
 
     def _classList_extend(self, lst):
-        self.document.add_diff({_OBJKEY_: self._id, 'addClass': lst})
+        self.document.add_diff({_OBJKEY_: self._id, '_addClass': lst})
         return True
 
     def _classList_remove(self, txt):
-        self.document.add_diff({_OBJKEY_: self._id, 'removeClass': [txt, ]})
+        self.document.add_diff({_OBJKEY_: self._id, '_removeClass': [txt, ]})
         return True
 
     def _classList_pop(self, idx):
@@ -657,19 +673,19 @@ class Element(object):
         raise NotImplemented    # todo
 
     def _classList_clear(self):
-        self.document.add_diff({_OBJKEY_: self._id, 'clearClass': True})
+        self.document.add_diff({_OBJKEY_: self._id, '_clearClass': True})
         return True
 
     def _style_set(self, key, value):
-        self.document.add_diff({_OBJKEY_: self._id, 'setStyle': {key: value}})
+        self.document.add_diff({_OBJKEY_: self._id, '_setStyle': {key: value}})
         return True
 
     def _style_delete(self, key):
-        self.document.add_diff({_OBJKEY_: self._id, 'deleteStyle': [key, ]})
+        self.document.add_diff({_OBJKEY_: self._id, '_deleteStyle': [key, ]})
         return True
 
     def _style_clear(self):
-        self.document.add_diff({_OBJKEY_: self._id, 'clearStyle': True})
+        self.document.add_diff({_OBJKEY_: self._id, '_clearStyle': True})
         return True
 
 
@@ -714,7 +730,7 @@ class Document(object):
     def createElement(self, tag):
         elm = Element(self, tag)
         dat = elm.dumps()
-        self.add_diff({_OBJKEY_: elm._id, 'createElement': dat})
+        self.add_diff({_OBJKEY_: elm._id, '_createElement': dat})
         self.obj_dic[elm._id] = elm
         return elm
 
@@ -724,7 +740,7 @@ class Document(object):
     """
 
     def tag(self, tagtxt, textContent=None, innerHTML=None, attrs=None,
-            onclick=None, onchange=None, handler=None, child=None):
+            onclick=None, onchange=None, handler=None, childList=None):
         """
         create a tag with a specification method similar to html.
 
@@ -734,7 +750,7 @@ class Document(object):
         :param attrs:
         :param onclick:
         :param onchange:
-        :param child:
+        :param childList:
         :return:
         """
         if not isinstance(tagtxt, str) or 0 == len(tagtxt):
@@ -767,7 +783,7 @@ class Document(object):
                 elif k == 'style':
                     elm.style.cssText = v
                 else:
-                    elm.pre_setattr(k, v)
+                    elm._pre_setattr(k, v)
                     elm.__dict__[k] = v
         if textContent is not None:
             elm.textContent = textContent
@@ -782,11 +798,11 @@ class Document(object):
         if onchange is not None:
             elm.onchange = onchange
         self.add_handler(elm, handler)
-        if child is not None:
-            if isinstance(child, list) or isinstance(child, tuple):
-                elm._child = ChildList(child)
+        if childList is not None:
+            if isinstance(childList, list) or isinstance(childList, tuple):
+                elm._childList = ChildList(elm, childList)
             else:
-                elm._child = ChildList([child, ])
+                elm._childList = ChildList(elm, [childList, ])
         return elm
 
     def add_handler(self, elm, handler):
@@ -808,7 +824,7 @@ class Document(object):
                     srcset=None, download=None, target=None,
                     readonly=None, disabled=None, placeholder=None, for_=None,
                     id_=None, accesskey=None, hidden=None, tabindex=None,
-                    style=None, className=None, child=None,
+                    style=None, className=None, childList=None,
                     onclick=None, onchange=None, handler=None):
         elm = self.createElement(tag)
         if type_ is not None:
@@ -893,8 +909,8 @@ class Document(object):
             elm.className = className
         if style is not None:
             elm.style.cssText = style
-        if child is not None:
-            elm.child = child
+        if childList is not None:
+            elm.childList = childList
         if onclick is not None:
             elm.onclick = onclick
         if onchange is not None:
@@ -938,10 +954,10 @@ class Document(object):
                                 id_=id_, style=style, className=className)
 
     def div(self, textContent=None, id_=None, style=None, className=None,
-            child=None):
+            childList=None):
         return self.create_with('div', textContent=textContent,
                                 id_=id_, style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def button(self, textContent='', type_='button', name=None, value=None,
                disabled=None, onclick=None,
@@ -1086,16 +1102,16 @@ class Document(object):
                                 id_=id_, style=style, className=className)
 
     def table(self, readonly=None, disabled=None,
-              id_=None, style=None, className=None, child=None):
+              id_=None, style=None, className=None, childList=None):
         return self.create_with('table',
                                 readonly=readonly, disabled=disabled,
                                 id_=id_, style=style, className=className,
-                                child=child)
+                                childList=childList)
 
-    def tr(self, id_=None, style=None, className=None, child=None):
+    def tr(self, id_=None, style=None, className=None, childList=None):
         return self.create_with('tr',
                                 id_=id_, style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def th(self, textContent, id_=None, style=None, className=None):
         return self.create_with('th', textContent=textContent,
@@ -1106,11 +1122,11 @@ class Document(object):
                                 id_=id_, style=style, className=className)
 
     def fieldset(self, textContent='', disabled=None,
-                 id_=None, style=None, className=None, child=None):
+                 id_=None, style=None, className=None, childList=None):
         return self.create_with('fieldset', textContent=textContent,
                                 disabled=disabled,
                                 id_=id_, style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def legend(self, textContent, disabled=None,
                id_=None, style=None, className=None):
@@ -1147,50 +1163,50 @@ class Document(object):
                                 style=style, className=className)
 
     def ol(self, textContent=None, id_=None, accesskey=None, hidden=None,
-           tabindex=None, style=None, className=None, child=None):
+           tabindex=None, style=None, className=None, childList=None):
         return self.create_with('ol', textContent=textContent,
                                 id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def li(self, textContent=None, id_=None, accesskey=None, hidden=None,
-           tabindex=None, style=None, className=None, child=None):
+           tabindex=None, style=None, className=None, childList=None):
         return self.create_with('li', textContent=textContent,
                                 id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def ul(self, id_=None, accesskey=None, hidden=None, tabindex=None,
-                style=None, className=None, child=None):
+                style=None, className=None, childList=None):
         return self.create_with('ul', id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def section(self, id_=None, accesskey=None, hidden=None, tabindex=None,
-                style=None, className=None, child=None):
+                style=None, className=None, childList=None):
         return self.create_with('section', id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def header(self, id_=None, accesskey=None, hidden=None, tabindex=None,
-                style=None, className=None, child=None):
+                style=None, className=None, childList=None):
         return self.create_with('header',
                                 id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
-                                child=child)
+                                childList=childList)
 
     def footer(self, id_=None, accesskey=None, hidden=None, tabindex=None,
-                style=None, className=None, child=None):
+                style=None, className=None, childList=None):
         return self.create_with('footer',
                                 id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
-                                child=child)
+                                childList=childList)
 
 
 class Window(object):

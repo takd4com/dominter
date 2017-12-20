@@ -2,14 +2,15 @@
 
 (function() {
   var excepts = ['_in_init_', 'tagName', 'document', 'parent',
-    '_id', '_objid_', '_classList', 'eventlisteners',
-    'attributes', '_child', '_onclick', 'onclick', '_onchange', 'onchange',
-    'setAttributes', 'removeAttributes',
+    '_id', '_objid_', '_classList', '_eventlisteners',
+    'attributes', '_childList', '_onclick', 'onclick', '_onchange', 'onchange',
+    '_setAttributes', '_removeAttributes',
     '_clearChild', '_reverseChild', '_on',
-    'addClass', 'removeClass', 'clearClass',
-    'setStyle', 'deleteStyle', 'clearStyle',
-    'removeChild', 'appendChild', '_insertBefore', '_replaceChild',
-    '_sortChild',
+    '_addClass', '_removeClass', '_clearClass',
+    '_setStyle', '_deleteStyle', '_clearStyle',
+    '_removeChild', '_appendChild', '_insertBefore', '_replaceChild',
+    '_sortChild', '_createElement',
+    '_addEventListener', '_removeEventListener',
   ];
   var headId, bodyId;
 
@@ -100,7 +101,7 @@
     if (val) {
       elm.onchange = createEventHandler(ws, 'change', val)
     }
-    val = dat['eventlisteners']
+    val = dat['_eventlisteners']
     if (val) {
       for (var tpl of val) {
         var typ = tpl[0];
@@ -126,8 +127,8 @@
         //elm = document.createElement(tagname);
         elm = newElement(dat)
       }
-      if (dat._child) {
-        appendElements(ws, elm, dat._child);
+      if (dat._childList) {
+        appendElements(ws, elm, dat._childList);
       }
       if (isnew) {
         parent.appendChild(elm);
@@ -193,14 +194,14 @@
         if (dat['onchange']) {
           elm.onchange = createEventHandler(ws, 'change', dat['onchange'])
         }
-        if ('setAttributes' in dat) {
-          var atrs = dat['setAttributes'];
+        if ('_setAttributes' in dat) {
+          var atrs = dat['_setAttributes'];
           for (var key of Object.keys(atrs)) {
             elm.setAttribute(key, atrs[key]);
           }
         }
-        if ('removeAttributes' in dat) {
-          var atrs = dat['removeAttributes'];
+        if ('_removeAttributes' in dat) {
+          var atrs = dat['_removeAttributes'];
           for (var key of atrs) {
             elm.removeAttribute(key);
           }
@@ -227,53 +228,53 @@
             elm.removeChild(elm.firstChild);
           }
           for (var od of lst) {
-            elm.appendChild(pre[od]);
+            elm.appendChild(pre[od])
           }
         }
-        if ('addClass' in dat) {
-          var lst = dat['addClass'];
+        if ('_addClass' in dat) {
+          var lst = dat['_addClass'];
           for (var cls of lst) {
             elm.classList.add(cls);
           }
         }
-        if ('removeClass' in dat) {
-          var lst = dat['removeClass'];
+        if ('_removeClass' in dat) {
+          var lst = dat['_removeClass'];
           for (var cls of lst) {
             elm.classList.remove(cls);
           }
         }
-        if ('clearClass' in dat) {
+        if ('_clearClass' in dat) {
           elm.className = '';
         }
-        if ('setStyle' in dat) {
-          var dic = dat['setStyle'];
+        if ('_setStyle' in dat) {
+          var dic = dat['_setStyle'];
           for (var k of Object.keys(dic)) {
             elm.style[k] = dic[k];
           }
         }
-        if ('deleteStyle' in dat) {
-          var lst = dat['deleteStyle'];
+        if ('_deleteStyle' in dat) {
+          var lst = dat['_deleteStyle'];
           for (var k of lst) {
             elm.style.removeProperty(k);
           }
         }
-        if ('clearStyle' in dat) {
+        if ('_clearStyle' in dat) {
           elm.style.cssText = '';
         }
-        if ('removeChild' in dat) {
-          var child = document.getElementById(dat['removeChild']);
-          if (child) {
-            elm.removeChild(child);
+        if ('_removeChild' in dat) {
+          var chd = document.getElementById(dat['_removeChild']);
+          if (chd) {
+            elm.removeChild(chd);
           }
         }
-        if ('appendChild' in dat) {
-          var aid = dat['appendChild'];
-          var child = document.getElementById(aid);
-          if (!child) {
-            child = findElm(newdic, aid);
+        if ('_appendChild' in dat) {
+          var aid = dat['_appendChild'];
+          var chd = document.getElementById(aid);
+          if (!chd) {
+            chd = findElm(newdic, aid);
           }
-          if (child) {
-            elm.appendChild(child);
+          if (chd) {
+            elm.appendChild(chd);
           }
         }
         if ('_insertBefore' in dat) {
@@ -319,8 +320,8 @@
           }
         }
       }
-      if ('createElement' in dat) {
-        var d = dat['createElement'];
+      if ('_createElement' in dat) {
+        var d = dat['_createElement'];
         if (d) {
           var newdat = JSON.parse(d);
           var newid = newdat['_id'];
@@ -357,15 +358,15 @@
     var dic = JSON.parse(ev.data);
     if ('head' in dic) {
       var head = dic['head'];
-      if (head['_child']) {
-        appendElements(ws, document.head, head['_child']);
+      if (head['_childList']) {
+        appendElements(ws, document.head, head['_childList']);
       }
       headId = head._id;
     }
     if ('body' in dic) {
       var body = dic['body'];
-      if (body['_child']) {
-        appendElements(ws, document.body, body['_child']);
+      if (body['_childList']) {
+        appendElements(ws, document.body, body['_childList']);
       }
       bodyId = body._id;
     }
