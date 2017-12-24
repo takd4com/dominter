@@ -24,7 +24,7 @@ _OBJKEY_ = '_objid_'
 
 
 class HookList(list):
-    def __init__(self, init_val=None, add_hook=None, extend_hook=None,
+    def __init__(self, init_val=None, append_hook=None, extend_hook=None,
                  insert_hook=None, remove_hook=None, pop_hook=None,
                  delitem_hook=None, reverse_hook=None, sort_hook=None,
                  clear_hook=None):
@@ -32,7 +32,7 @@ class HookList(list):
             super(HookList, self).__init__()
         else:
             super(HookList, self).__init__(init_val)
-        self.add_hook = add_hook
+        self.append_hook = append_hook
         self.extend_hook = extend_hook
         self.insert_hook = insert_hook
         self.remove_hook = remove_hook
@@ -46,8 +46,8 @@ class HookList(list):
         super(HookList, self).append(txt)
 
     def append(self, txt):
-        if callable(self.add_hook):
-            if self.add_hook(txt):
+        if callable(self.append_hook):
+            if self.append_hook(txt):
                 super(HookList, self).append(txt)
         else:
             super(HookList, self).append(txt)
@@ -170,7 +170,7 @@ class ChildList(HookList):
             init_val = []
         super(ChildList, self).__init__(
             init_val=init_val,
-            add_hook=elm._child_add,
+            append_hook=elm._child_append,
             extend_hook=elm._child_extend,
             insert_hook=elm._child_insert,
             remove_hook=elm._child_remove,
@@ -189,7 +189,7 @@ class ClassList(HookList):
             init_val = []
         super(ClassList, self).__init__(
             init_val=init_val,
-            add_hook=elm._classList_add,
+            append_hook=elm._classList_append,
             extend_hook=elm._classList_extend,
             insert_hook=elm._classList_insert,
             remove_hook=elm._classList_remove,
@@ -596,12 +596,12 @@ class Element(object):
             return name
         raise TypeError(repr(obj) + " is not serializable!")
 
-    def _child_add(self, elm):
+    def _child_append(self, elm):
         self.appendChild(elm)
         return False
 
     def _child_insert(self, index, elm):
-        self.insertBefore(self.childList[index], elm)
+        self.insertBefore(elm, self.childList[index])
         return False
 
     def _child_extend(self, lst):
@@ -623,8 +623,10 @@ class Element(object):
     def _child_delitem(self, idx):
         cnt = len(self._childList)
         if isinstance(idx, slice):
-            if (0 <= idx.start < cnt) and (0 <= idx.stop < cnt):
-                lst = list([self._childList[j] for j in range(idx.start, idx.stop, idx.step)])
+            if 0 <= idx.start < cnt:
+                rng = (range(idx.start, idx.stop) if idx.step is None
+                       else range(idx.start, idx.stop, idx.step))
+                lst = list([self._childList[j] for j in rng if j < cnt])
                 for elm in lst:
                     self.removeChild(elm)
         elif isinstance(idx, int):
@@ -650,7 +652,7 @@ class Element(object):
             elm.parent = None
         return True
 
-    def _classList_add(self, txt):
+    def _classList_append(self, txt):
         self.document.add_diff({_OBJKEY_: self._id, '_addClass': [txt, ]})
         return True
 
