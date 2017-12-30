@@ -314,7 +314,7 @@ class TestDominter(unittest.TestCase):
         hl._raw_clear()
         hl._raw_extend(iv)
         hl[:] = [1, 2, 3, 4, 5, 6 ]
-        slv = slice(0, 2147483647, None) if ispymaj(2) else slice(None, None, None)
+        slv = slice(0, sys.maxint, None) if ispymaj(2) else slice(None, None, None)
         self.assertEqual(self.hl_setitem_idx, slv)
         self.assertEqual(self.hl_setitem_value, [1, 2, 3, 4, 5, 6 ])
         self.assertEqual(hl, [1, 2, 3, 4, 5, 6 ])
