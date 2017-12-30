@@ -26,8 +26,8 @@ _OBJKEY_ = '_objid_'
 class HookList(list):
     def __init__(self, init_val=None, append_hook=None, extend_hook=None,
                  insert_hook=None, remove_hook=None, pop_hook=None,
-                 delitem_hook=None, reverse_hook=None, sort_hook=None,
-                 clear_hook=None):
+                 setitem_hook=None, delitem_hook=None,
+                 reverse_hook=None, sort_hook=None, clear_hook=None):
         if init_val is None:
             super(HookList, self).__init__()
         else:
@@ -37,6 +37,7 @@ class HookList(list):
         self.insert_hook = insert_hook
         self.remove_hook = remove_hook
         self.pop_hook = pop_hook
+        self.setitem_hook = setitem_hook
         self.delitem_hook = delitem_hook
         self.reverse_hook = reverse_hook
         self.sort_hook = sort_hook
@@ -99,6 +100,27 @@ class HookList(list):
             return elm
         else:
             return self._raw_pop(idx)
+
+    def _raw_setitem(self, idx, value):
+        super(HookList, self).__setitem__(idx, value)
+
+    def __setitem__(self, idx, value):
+        if callable(self.setitem_hook):
+            if self.setitem_hook(idx, value):
+                super(HookList, self).__setitem__(idx, value)
+        else:
+            super(HookList, self).__setitem__(idx, value)
+
+    # setslice is python2 only
+    def _raw_setslice(self, i, j, value):
+        super(HookList, self).__setslice__(i, j, value)
+
+    def __setslice__(self, i, j, value):
+        if callable(self.setitem_hook):
+            if self.setitem_hook(slice(i, j, None), value):
+                super(HookList, self).__setslice__(i, j, value)
+        else:
+            super(HookList, self).__setslice__(i, j, value)
 
     def _raw_delitem(self, idx):
         super(HookList, self).__delitem__(idx)
@@ -170,15 +192,16 @@ class ChildList(HookList):
             init_val = []
         super(ChildList, self).__init__(
             init_val=init_val,
-            append_hook=elm._child_append,
-            extend_hook=elm._child_extend,
-            insert_hook=elm._child_insert,
-            remove_hook=elm._child_remove,
-            pop_hook=elm._child_pop,
-            delitem_hook=elm._child_delitem,
-            reverse_hook=elm._child_reverse,
-            sort_hook=elm._child_sort,
-            clear_hook=elm._child_clear,
+            append_hook=elm._childList_append,
+            extend_hook=elm._childList_extend,
+            insert_hook=elm._childList_insert,
+            remove_hook=elm._childList_remove,
+            pop_hook=elm._childList_pop,
+            setitem_hook=elm._childList_setitem,
+            delitem_hook=elm._childList_delitem,
+            reverse_hook=elm._childList_reverse,
+            sort_hook=elm._childList_sort,
+            clear_hook=elm._childList_clear,
         )
 
 
@@ -194,6 +217,7 @@ class ClassList(HookList):
             insert_hook=elm._classList_insert,
             remove_hook=elm._classList_remove,
             pop_hook=elm._classList_pop,
+            setitem_hook=elm._classList_setitem,
             delitem_hook=elm._classList_delitem,
             clear_hook=elm._classList_clear,
         )
@@ -359,7 +383,7 @@ class Element(object):
         #self.onmousemove = None
 
     # dif_dat除外
-    dif_excepts = ['_in_init_', '_on', 'classList', 'style',
+    dif_excepts = ['_in_init_', '_on', 'classList', '_classList', 'style',
                    'childList', '_childList',
                    'parent', 'document',
                    'onclick', '_onclick',
@@ -411,7 +435,7 @@ class Element(object):
         self._set_class_name(value)
 
     def _set_class_name(self, txt):
-        classlist = self.__dict__['_classList']
+        classlist = self._classList
         classlist._set_class_name(txt)
 
     @property
@@ -596,49 +620,97 @@ class Element(object):
             return name
         raise TypeError(repr(obj) + " is not serializable!")
 
-    def _child_append(self, elm):
+    def _childList_append(self, elm):
         self.appendChild(elm)
         return False
 
-    def _child_insert(self, index, elm):
+    def _childList_insert(self, index, elm):
         self.insertBefore(elm, self.childList[index])
         return False
 
-    def _child_extend(self, lst):
+    def _childList_extend(self, lst):
         for elm in lst:
             self.appendChild(elm)
         return False
 
-    def _child_remove(self, elm):
+    def _childList_remove(self, elm):
         self.removeChild(elm)
         return False
 
-    def _child_pop(self, idx):
+    def _childList_pop(self, idx):
         elm = None
         if 0 <= idx < len(self._childList):
             elm = self._childList[idx]
             self.removeChild(elm)
         return False, elm
 
-    def _child_delitem(self, idx):
-        cnt = len(self._childList)
-        if isinstance(idx, slice):
-            if 0 <= idx.start < cnt:
-                rng = (range(idx.start, idx.stop) if idx.step is None
-                       else range(idx.start, idx.stop, idx.step))
-                lst = list([self._childList[j] for j in rng if j < cnt])
+    def _childList_setitem(self, idx, value):
+        if isinstance(idx, int):
+            elm = self._childList[idx]
+            if not isinstance(value, Element):
+                raise TypeError('can only assign an Element')
+            self.insertBefore(value, elm)
+            if elm:
+                self.removeChild(elm)
+        elif isinstance(idx, slice):
+            lst = self._childList[idx]
+            if (not isinstance(value, list)) and (not isinstance(value, tuple)):
+                raise TypeError('can only assign an iterable')
+            stp = idx.step
+            if (stp is not None) and (stp != 1):
+                siz = len(self._childList)
+                def pn(val, isst):
+                    if val is None:
+                        if 0 < stp:
+                            return 0 if isst else siz
+                        else:
+                            return siz - 1 if isst else -1
+                    elif 0 > val:
+                        return siz + val
+                    else:
+                        return val
+                bg = pn(idx.start, True)
+                ed = pn(idx.stop, False)
+                # force 0 > step
+                if 0 < stp:
+                    bg, ed, stp = ed - 1, bg - 1, -stp
+                    value.reverse()
+                cnt = 0
+                for j in range(bg, ed, stp):
+                    elm = value[cnt]
+                    cnt += 1
+                    ref = self._childList[j]
+                    self.insertBefore(elm, ref)
                 for elm in lst:
                     self.removeChild(elm)
-        elif isinstance(idx, int):
-            if 0 <= idx < cnt:
-                self.removeChild(self._childList[idx])
+            elif 0 == len(lst):
+                for elm in value:
+                    self.appendChild(elm)
+            else:
+                ref = lst[0]
+                for elm in value:
+                    self.insertBefore(elm, ref)
+                for elm in lst:
+                    self.removeChild(elm)
+        else:
+            raise TypeError('bad value type')
         return False
 
-    def _child_reverse(self):
+    def _childList_delitem(self, idx):
+        lst = self._childList[idx]
+        if lst:
+            if isinstance(lst, Element):
+                self.removeChild(lst)
+            else:
+                for elm in lst:
+                    self.removeChild(elm)
+        return False
+
+    def _childList_reverse(self):
         self.document.add_diff({_OBJKEY_: self._id, '_reverseChild': True})
         return True
 
-    def _child_sort(self, key=None, reverse=False):
+    def _childList_sort(self, key=None, reverse=False):
         for j, elm in enumerate(self.childList):
             elm._on = j
         self.childList._raw_sort(key=key, reverse=reverse)
@@ -646,7 +718,7 @@ class Element(object):
         self.document.add_diff({_OBJKEY_: self._id, '_sortChild': ordr})
         return False
 
-    def _child_clear(self):
+    def _childList_clear(self):
         self.document.add_diff({_OBJKEY_: self._id, '_clearChild': True})
         for elm in self.childList:
             elm.parent = None
@@ -669,10 +741,41 @@ class Element(object):
         return True
 
     def _classList_pop(self, idx):
-        raise NotImplemented    # todo
+        if 0 <= idx < len(self._classList):
+            txt = self._classList[idx]
+            self.document.add_diff({_OBJKEY_: self._id, '_removeClass': [txt, ]})
+        return True, None
+
+    def _classList_setitem(self, idx, value):
+        if isinstance(idx, int):
+            elm = self._classList[idx]
+            if not isinstance(value, str):
+                raise TypeError('can only assign an str')
+            self.document.add_diff({_OBJKEY_: self._id, '_addClass': [value, ]})
+            if elm:
+                self.document.add_diff({_OBJKEY_: self._id, '_removeClass': [elm, ]})
+        elif isinstance(idx, slice):
+            lst = self._classList[idx]
+            if (not isinstance(value, list)) and (not isinstance(value, tuple)):
+                raise TypeError('can only assign an iterable')
+            if 0 == len(lst):
+                for elm in value:
+                    self.document.add_diff({_OBJKEY_: self._id, '_addClass': elm})
+            else:
+                ref = lst[0]
+                self.document.add_diff({_OBJKEY_: self._id, '_addClass': value})
+                self.document.add_diff({_OBJKEY_: self._id, '_removeClass': lst})
+        else:
+            raise TypeError('bad value type')
+        return True
 
     def _classList_delitem(self, idx):
-        raise NotImplemented    # todo
+        lst = self._classList[idx]
+        if lst:
+            if isinstance(lst, str):
+                lst = [lst,]
+            self.document.add_diff({_OBJKEY_: self._id, '_removeClass': lst})
+        return True
 
     def _classList_clear(self):
         self.document.add_diff({_OBJKEY_: self._id, '_clearClass': True})
@@ -1216,23 +1319,19 @@ class Window(object):
     virtual window class
     """
     def __init__(self):
+        self.document = Document()
         #self.location = ''
         #self.name = ''
-        self.document = Document()
-        doc = self.document
-        # copy document method
-        self
-
 
     def _dumps(self):
         if self.document.dirty:
             logger.debug('create cache')
-            str = json.dumps(self.document, default=self._serializer, indent=2)
-            self.document.cache = str
+            s = json.dumps(self.document, default=self._serializer, indent=2)
+            self.document.cache = s
             self.document.dirty = False
         else:
-            str = self.document.cache
-        return str
+            s = self.document.cache
+        return s
 
     @staticmethod
     def _serializer(obj):

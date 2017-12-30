@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 import unittest
 import json
+import sys
 
 from dominter.dom import Window, start_app
 import dominter.dom as domdom
 
+
+def ispymaj(v):
+    return sys.version_info.major == v
 
 class TestDominter(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -14,11 +18,13 @@ class TestDominter(unittest.TestCase):
         self.hl_return_pop = 'pop return'
         self.hl_add_elm = None
         self.hl_extend_lst = None
-        self.hl_insert_idx = -1
+        self.hl_insert_idx = None
         self.hl_insert_elm = None
         self.hl_remove_elm = None
-        self.hl_pop_idx = -1
-        self.hl_delitem_idx = -1
+        self.hl_pop_idx = None
+        self.hl_setitem_idx =None
+        self.hl_setitem_value = None
+        self.hl_delitem_idx = None
         self.hl_reverse_cnt = 0
         self.hl_sort_cnt = 0
         self.hl_sort_key = None
@@ -46,6 +52,11 @@ class TestDominter(unittest.TestCase):
         self.hl_pop_idx = idx
         return self.hl_return_val, self.hl_return_pop
 
+    def hl_setitem_hook(self, idx, value):
+        self.hl_setitem_idx = idx
+        self.hl_setitem_value = value
+        return self.hl_return_val
+
     def hl_delitem_hook(self, idx):
         self.hl_delitem_idx = idx
         return self.hl_return_val
@@ -71,6 +82,7 @@ class TestDominter(unittest.TestCase):
                              insert_hook=self.hl_inserted_hook,
                              remove_hook=self.hl_remove_hook,
                              pop_hook=self.hl_pop_hook,
+                             setitem_hook=self.hl_setitem_hook,
                              delitem_hook=self.hl_delitem_hook,
                              reverse_hook=self.hl_reverse_hook,
                              sort_hook=self.hl_sort_hook,
@@ -86,6 +98,7 @@ class TestDominter(unittest.TestCase):
         hl.append('test3')
         self.assertEqual(self.hl_add_elm, 'test3')
         self.assertEqual(hl, ['test1', 'test2'])
+
         # add
         hl.add('test4')
         self.assertEqual(self.hl_add_elm, 'test4')
@@ -94,6 +107,7 @@ class TestDominter(unittest.TestCase):
         hl.add('test5')
         self.assertEqual(self.hl_add_elm, 'test5')
         self.assertEqual(hl, ['test1', 'test2', 'test5'])
+
         # extend
         hl._raw_extend(['test6', 'test7'])
         self.assertEqual(self.hl_extend_lst, None)
@@ -105,9 +119,10 @@ class TestDominter(unittest.TestCase):
         hl.extend(['test9', 'test10', 'test11', ])
         self.assertEqual(self.hl_extend_lst, ['test9', 'test10', 'test11', ])
         self.assertEqual(hl, ['test1', 'test2', 'test5', 'test6', 'test7', 'test8'])
+
         # insert
         hl._raw_insert(1, 'test1.5')
-        self.assertEqual(self.hl_insert_idx, -1)
+        self.assertEqual(self.hl_insert_idx, None)
         self.assertEqual(self.hl_insert_elm, None)
         self.assertEqual(hl, ['test1', 'test1.5', 'test2', 'test5', 'test6', 'test7', 'test8'])
         hl.insert(2, 'test1.8')
@@ -119,6 +134,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(self.hl_insert_idx, 0)
         self.assertEqual(self.hl_insert_elm, 'test0.5')
         self.assertEqual(hl, ['test0.5', 'test1', 'test1.5', 'test2', 'test5', 'test6', 'test7', 'test8'])
+
         # remove
         hl._raw_remove('test8')
         self.assertEqual(self.hl_remove_elm, None)
@@ -130,10 +146,11 @@ class TestDominter(unittest.TestCase):
         hl.remove('test2')
         self.assertEqual(self.hl_remove_elm, 'test2')
         self.assertEqual(hl, ['test0.5', 'test1.5', 'test2', 'test5', 'test6', 'test7', ])
+
         # pop
         elm = hl._raw_pop(2)
         self.assertEqual(elm, 'test2')
-        self.assertEqual(self.hl_pop_idx, -1)
+        self.assertEqual(self.hl_pop_idx, None)
         self.assertEqual(hl, ['test0.5', 'test1.5', 'test5', 'test6', 'test7', ])
         elm = hl.pop(0)
         self.assertEqual(elm, self.hl_return_pop)
@@ -144,9 +161,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm, 'test6')
         self.assertEqual(self.hl_pop_idx, 3)
         self.assertEqual(hl, ['test0.5', 'test1.5', 'test5', 'test7', ])
+
         # delitem
         hl._raw_delitem(3)
-        self.assertEqual(self.hl_delitem_idx, -1)
+        self.assertEqual(self.hl_delitem_idx, None)
         self.assertEqual(hl, ['test0.5', 'test1.5', 'test5', ])
         del hl[1]
         self.assertEqual(self.hl_delitem_idx, 1)
@@ -162,6 +180,7 @@ class TestDominter(unittest.TestCase):
         del hl[0:3]
         self.assertEqual(self.hl_delitem_idx, slice(0, 3, None))
         self.assertEqual(hl, ['test7', 'test8', 'test9'])
+
         # reverse
         hl._raw_reverse()
         self.assertEqual(self.hl_reverse_cnt, 0)
@@ -173,6 +192,7 @@ class TestDominter(unittest.TestCase):
         hl.reverse()
         self.assertEqual(self.hl_reverse_cnt, 2)
         self.assertEqual(hl, ['test7', 'test8', 'test9'])
+
         # sort
         hl.extend(['test2', 'Test4', 'Test3'])
         hl._raw_sort(reverse=True)
@@ -221,6 +241,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(self.hl_sort_key, str.lower)
         self.assertEqual(self.hl_sort_reverse, False)
         self.assertEqual(hl, ['test2', 'Test3', 'Test4', 'test7', 'test8', 'test9'])
+
         # contains
         self.assertTrue(hl.contains('test2'))
         self.assertTrue(hl.contains('Test3'))
@@ -229,12 +250,14 @@ class TestDominter(unittest.TestCase):
         self.assertTrue(hl.contains('test8'))
         self.assertTrue(hl.contains('test9'))
         self.assertFalse(hl.contains('Test2'))
+
         # toggle
         self.hl_return_val = True
         hl.toggle('Test4')
         self.assertEqual(hl, ['test2', 'Test3', 'test7', 'test8', 'test9'])
         hl.toggle('Test4')
         self.assertEqual(hl, ['test2', 'Test3', 'test7', 'test8', 'test9', 'Test4'])
+
         # clear
         self.hl_return_val = False
         hl._raw_clear()
@@ -249,36 +272,90 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(self.hl_clear_cnt, 2)
         self.assertEqual(hl, [])
 
+        # setitem
+        iv = ['test2', 'Test3', 'test7', 'test8', 'test9', 'Test4']
+        self.hl_return_val = False
+        hl._raw_clear()
+        hl._raw_extend(iv)
+        self.assertEqual(self.hl_setitem_idx, None)
+        hl[0] = 'test2m'
+        self.assertEqual(self.hl_setitem_idx, 0)
+        self.assertEqual(self.hl_setitem_value, 'test2m')
+        self.assertEqual(hl, iv)
+        hl[:2] = ['testm0', 'testm1', ]
+        slv = slice(0, 2, None) if ispymaj(2) else slice(None, 2, None)
+        self.assertEqual(self.hl_setitem_idx, slv)
+        self.assertEqual(self.hl_setitem_value, ['testm0', 'testm1', ])
+        self.assertEqual(hl, iv)
+        hl[-1:-3:-2] = ['testm0', ]
+        self.assertEqual(self.hl_setitem_idx, slice(-1, -3, -2))
+        self.assertEqual(self.hl_setitem_value, ['testm0', ])
+        self.assertEqual(hl, iv)
+        self.hl_return_val = True
+        hl._raw_clear()
+        hl._raw_extend(iv)
+        hl[0] = 'test2m'
+        self.assertEqual(self.hl_setitem_idx, 0)
+        self.assertEqual(self.hl_setitem_value, 'test2m')
+        self.assertEqual(hl, ['test2m', 'Test3', 'test7', 'test8', 'test9', 'Test4'])
+        hl._raw_clear()
+        hl._raw_extend(iv)
+        hl[:2] = ['testm0', 'testm1', ]
+        slv = slice(0, 2, None) if ispymaj(2) else slice(None, 2, None)
+        self.assertEqual(self.hl_setitem_idx, slv)
+        self.assertEqual(self.hl_setitem_value, ['testm0', 'testm1', ])
+        self.assertEqual(hl, ['testm0', 'testm1', 'test7', 'test8', 'test9', 'Test4'])
+        hl._raw_clear()
+        hl._raw_extend(iv)
+        hl[-1:-5:-2] = ['testm0', 'testm1', ]
+        self.assertEqual(self.hl_setitem_idx, slice(-1, -5, -2))
+        self.assertEqual(self.hl_setitem_value, ['testm0', 'testm1', ])
+        self.assertEqual(hl, ['test2', 'Test3', 'test7', 'testm1', 'test9', 'testm0'])
+        hl._raw_clear()
+        hl._raw_extend(iv)
+        hl[:] = [1, 2, 3, 4, 5, 6 ]
+        slv = slice(0, 2147483647, None) if ispymaj(2) else slice(None, None, None)
+        self.assertEqual(self.hl_setitem_idx, slv)
+        self.assertEqual(self.hl_setitem_value, [1, 2, 3, 4, 5, 6 ])
+        self.assertEqual(hl, [1, 2, 3, 4, 5, 6 ])
+
         # init_val
         hl = domdom.HookList(init_val=[1, 2, 3, 4, ])
         self.assertEqual(hl, [1, 2, 3, 4, ])
         hl = domdom.HookList(init_val=None)  # no hooks
         self.hl_return_val = False
+
         # append
         hl._raw_append('test1')
         hl.append('test2')
         self.assertEqual(hl, ['test1', 'test2'])
+
         # add
         hl.add('test4')
         self.assertEqual(hl, ['test1', 'test2', 'test4'])
+
         # extend
         hl._raw_extend(['test6', 'test7'])
         hl.extend(['test8', ])
         self.assertEqual(hl, ['test1', 'test2', 'test4', 'test6', 'test7', 'test8'])
+
         # insert
         hl._raw_insert(1, 'test1.5')
         hl.insert(0, 'test0.5')
         self.assertEqual(hl, ['test0.5', 'test1', 'test1.5', 'test2', 'test4', 'test6', 'test7', 'test8'])
+
         # remove
         hl._raw_remove('test8')
         hl.remove('test1')
         self.assertEqual(hl, ['test0.5', 'test1.5', 'test2', 'test4', 'test6', 'test7', ])
+
         # pop
         elm = hl._raw_pop(2)
         self.assertEqual(elm, 'test2')
         elm = hl.pop(3)
         self.assertEqual(elm, 'test6')
         self.assertEqual(hl, ['test0.5', 'test1.5', 'test4', 'test7', ])
+
         # delitem
         hl._raw_delitem(3)
         del hl[1]
@@ -286,11 +363,13 @@ class TestDominter(unittest.TestCase):
         hl.extend(['test6', 'test7', 'test8', 'test9'])
         del hl[0:3]
         self.assertEqual(hl, ['test7', 'test8', 'test9'])
+
         # reverse
         hl._raw_reverse()
         self.assertEqual(hl, ['test9', 'test8', 'test7'])
         hl.reverse()
         self.assertEqual(hl, ['test7', 'test8', 'test9'])
+
         # sort
         hl.extend(['test2', 'Test4', 'Test3'])
         hl._raw_sort(reverse=True)
@@ -690,6 +769,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_setStyle'], styl1)
+
         # __setattr__() onclick
         handlers = document.handlers
         self.assertEqual(len(handlers), 0)
@@ -761,6 +841,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_appendChild'], chd._id)
+
         # childList append() to []
         elm.childList.append(chd2)
         self.assertEqual(elm.childList, [chd, chd2])
@@ -770,6 +851,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_appendChild'], chd2._id)
+
         # childList insert(0) to [x, y]
         elm.childList.insert(0, chd3)
         self.assertEqual(elm.childList, [chd3, chd, chd2])
@@ -779,6 +861,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_insertBefore'], [chd3._id, chd._id])
+
         # childList clear()
         elm.childList.clear()
         self.assertEqual(elm.childList, [])
@@ -800,6 +883,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_appendChild'], chd._id)
+
         # childList insert(0) to [x]
         elm.childList.insert(0, chd2)
         self.assertEqual(elm.childList, [chd2, chd, ])
@@ -809,6 +893,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_insertBefore'], [chd2._id, chd._id])
+
         # childList insert(1) to [x, y]
         elm.childList.insert(1, chd3)
         self.assertEqual(elm.childList, [chd2, chd3, chd, ])
@@ -818,6 +903,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_insertBefore'], [chd3._id, chd._id])
+
         # childList clear()
         elm.childList.clear()
         self.assertEqual(elm.childList, [])
@@ -843,6 +929,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_appendChild'], chd2._id)
+
         # childList append() to [x, y]
         elm.childList.append(chd3)
         self.assertEqual(elm.childList, [chd, chd2, chd3])
@@ -851,6 +938,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_appendChild'], chd3._id)
+
         # childList remove(y) from [x, y, z]
         elm.childList.remove(chd2)
         self.assertEqual(elm.childList, [chd, chd3])
@@ -859,6 +947,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeChild'], chd2._id)
+
         # childList remove(x) from [x, y]
         elm.childList.remove(chd)
         self.assertEqual(elm.childList, [chd3, ])
@@ -867,6 +956,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeChild'], chd._id)
+
         # childList extend([y, z]) to [x]
         elm.childList.extend([chd, chd2])
         self.assertEqual(elm.childList, [chd3, chd, chd2])
@@ -879,6 +969,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_appendChild'], chd2._id)
+
         # childList pop y from [x, y, z]
         chk = elm.childList.pop(1)
         self.assertEqual(chk, chd)
@@ -888,6 +979,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeChild'], chd._id)
+
         # childList pop y from [x, y,]
         chk = elm.childList.pop(1)
         self.assertEqual(chk, chd2)
@@ -897,6 +989,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeChild'], chd2._id)
+
         # childList pop x from [x,]
         chk = elm.childList.pop(0)
         self.assertEqual(chk, chd3)
@@ -924,6 +1017,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_appendChild'], chd3._id)
+
         # childList reverse()
         elm.childList.reverse()
         self.assertEqual(elm.childList, [chd3, chd2, chd])
@@ -932,6 +1026,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_reverseChild'], True)
+
         # childList sort()
         elm.childList.sort(lambda x: x.tagName)
         self.assertEqual(elm.childList, [chd2, chd3, chd])
@@ -1006,6 +1101,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeChild'], chd._id)
+
         # childList del 1 from [x, y, z]
         elm.childList = [chd, chd2, chd3]
         ddcnt += 4
@@ -1017,6 +1113,7 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeChild'], chd2._id)
+
         # childList del 2 from [x, y, z]
         elm.childList = [chd, chd2, chd3]
         ddcnt += 4
@@ -1029,7 +1126,423 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeChild'], chd3._id)
 
+        # childList del -1 from [x, y, z]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        del elm.childList[-1]
+        self.assertEqual(elm.childList, [chd, chd2])
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList del -2: from [x, y, z]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        del elm.childList[-2:]
+        self.assertEqual(elm.childList, [chd, ])
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem
+        chd4 = document.createElement('chd4tag')
+        chd5 = document.createElement('chd5tag')
+        ddcnt += 2
+        # childList setitem [0] to [1,2,3]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[0] = chd4
+        self.assertEqual(elm.childList, [chd4, chd2, chd3])
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+
+        # childList setitem [-3] to [1,2,3]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[-3] = chd4
+        self.assertEqual(elm.childList, [chd4, chd2, chd3])
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+
+        # childList setitem [1] to [1,2,3]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[1] = chd4
+        self.assertEqual(elm.childList, [chd, chd4, chd3])
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [-2] to [1,2,3]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[1] = chd4
+        self.assertEqual(elm.childList, [chd, chd4, chd3])
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [2] to [1,2,3]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[2] = chd4
+        self.assertEqual(elm.childList, [chd, chd2, chd4])
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [-1] to [1,2,3]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[2] = chd4
+        self.assertEqual(elm.childList, [chd, chd2, chd4])
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [1:5]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[1:5] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd, chd4, chd5])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [-2:5]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[-2:5] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd, chd4, chd5])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [1:]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[1:] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd, chd4, chd5])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [-2:]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[-2:] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd, chd4, chd5])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [0:2]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[0:2] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd4, chd5, chd3])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [-3:-1]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[-3:-1] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd4, chd5, chd3])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [:2]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[:2] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd4, chd5, chd3])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [:-1]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[:-1] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd4, chd5, chd3])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [0:3:2]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[0:3:2] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd4, chd2, chd5])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [-3::2]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[-3::2] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd4, chd2, chd5])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+
+        # childList setitem [2:0:-1]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[2:0:-1] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd, chd5, chd4])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [-1:0:-1]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[-1:0:-1] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd, chd5, chd4])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd2._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd2._id)
+
+        # childList setitem [2::-2]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[2::-2] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd5, chd2, chd4])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+
+        # childList setitem [-1::-2]
+        elm.childList = [chd, chd2, chd3]
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.childList[-1::-2] = [chd4, chd5]
+        self.assertEqual(elm.childList, [chd5, chd2, chd4])
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd4.id, chd3._id])
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_insertBefore'], [chd5.id, chd._id])
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd3._id)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeChild'], chd._id)
+
         # classList
+        # classList clear by className
         elm.className = ''
         lst = elm.classList
         ddcnt += 1
@@ -1038,37 +1551,42 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['className'], '')
         self.assertEqual(len(lst), 0)
-        #
+
+        # classList [].append(x)
         elm.classList.append('clsb1')
+        self.assertEqual(len(lst), 1)
+        self.assertEqual(lst[0], 'clsb1')
         ddcnt += 1
         self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_addClass'], ['clsb1', ])
-        self.assertEqual(len(lst), 1)
-        self.assertEqual(lst[0], 'clsb1')
-        #
+
+        # classList [x].add(y)
         elm.classList.add('clsb2')
+        self.assertEqual(len(lst), 2)
+        self.assertEqual(lst[1], 'clsb2')
         ddcnt += 1
         self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_addClass'], ['clsb2', ])
-        self.assertEqual(len(lst), 2)
-        self.assertEqual(lst[1], 'clsb2')
-        #
+
+        # classList [1,2].extend([3,4,5])
         elm.classList.extend(['clsb3', 'clsb4', 'clsb5'])
+        self.assertEqual(len(lst), 5)
+        self.assertEqual(lst[2], 'clsb3')
+        self.assertEqual(lst[3], 'clsb4')
+        self.assertEqual(lst[4], 'clsb5')
         ddcnt += 1
         self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_addClass'], ['clsb3', 'clsb4', 'clsb5'])
-        self.assertEqual(len(lst), 5)
-        self.assertEqual(lst[2], 'clsb3')
-        self.assertEqual(lst[3], 'clsb4')
-        self.assertEqual(lst[4], 'clsb5')
-        #
+
+        # classList [1,2,3,4,5].insert(2, 1.5)
         elm.classList.insert(2, 'clsb1.5')
+        self.assertEqual(len(lst), 6)
         self.assertEqual(elm.className, 'clsb1 clsb2 clsb1.5 clsb3 clsb4 clsb5')
         self.assertTrue(elm.classList.contains('clsb1'))
         ddcnt += 1
@@ -1076,9 +1594,10 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_addClass'], ['clsb1.5', ])
-        self.assertEqual(len(lst), 6)
-        #
+
+        # classList [1,2,1.5,3,4,5].remove(1)
         elm.classList.remove('clsb1')
+        self.assertEqual(len(lst), 5)
         self.assertFalse(elm.classList.contains('clsb1'))
         self.assertTrue(elm.classList.contains('clsb4'))
         ddcnt += 1
@@ -1086,9 +1605,10 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeClass'], ['clsb1', ])
-        self.assertEqual(len(lst), 5)
-        #
+
+        # classList [2,1.5,3,4,5].remove(4)
         elm.classList.remove('clsb4')
+        self.assertEqual(len(lst), 4)
         self.assertFalse(elm.classList.contains('clsb4'))
         self.assertEqual(elm.className, 'clsb2 clsb1.5 clsb3 clsb5')
         self.assertTrue(elm.classList.contains('clsb5'))
@@ -1097,9 +1617,10 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeClass'], ['clsb4', ])
-        self.assertEqual(len(lst), 4)
-        #
+
+        # classList [2,1.5,3,5].remove(5)
         elm.classList.remove('clsb5')
+        self.assertEqual(len(lst), 3)
         self.assertFalse(elm.classList.contains('clsb5'))
         self.assertEqual(elm.className, 'clsb2 clsb1.5 clsb3')
         ddcnt += 1
@@ -1107,34 +1628,490 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeClass'], ['clsb5', ])
-        self.assertEqual(len(lst), 3)
-        #
+
+        # classList [2,1.5,3].toggle(6)
         elm.classList.toggle('clsb6')
+        self.assertEqual(len(lst), 4)
         self.assertEqual(elm.className, 'clsb2 clsb1.5 clsb3 clsb6')
         ddcnt += 1
         self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_addClass'], ['clsb6', ])
-        self.assertEqual(len(lst), 4)
-        #
+
+        # classList [2,1.5,3,6].toggle(6)
         elm.classList.toggle('clsb6')
+        self.assertEqual(len(lst), 3)
         self.assertEqual(elm.className, 'clsb2 clsb1.5 clsb3')
         ddcnt += 1
         self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_removeClass'], ['clsb6', ])
-        self.assertEqual(len(lst), 3)
-        #
-        elm.classList.clear()
+
+        # classList [2,1.5,3].pop(1)
+        cn = elm.classList.pop(1)
+        self.assertEqual(cn, 'clsb1.5')
+        self.assertEqual(len(lst), 2)
+        self.assertEqual(elm.className, 'clsb2 clsb3')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsb1.5', ])
+
+        # classList [2,3].pop(1)
+        cn = elm.classList.pop(1)
+        self.assertEqual(cn, 'clsb3')
+        self.assertEqual(len(lst), 1)
+        self.assertEqual(elm.className, 'clsb2')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsb3', ])
+
+        # classList [2].pop(0)
+        cn = elm.classList.pop(0)
+        self.assertEqual(cn, 'clsb2')
+        self.assertEqual(len(lst), 0)
         self.assertEqual(elm.className, '')
         ddcnt += 1
         self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
-        self.assertEqual(ddd['_clearClass'], True)
+        self.assertEqual(ddd['_removeClass'], ['clsb2', ])
+
+        # classList setitem [0] to [1,2,3]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[0] = 'clsc4'
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc2 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', ])
+
+        # classList setitem [-3] to [1,2,3]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-3] = 'clsc4'
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc2 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', ])
+
+        # classList setitem [1] to [1,2,3]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[1] = 'clsc4'
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc4 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', ])
+
+        # classList setitem [-2] to [1,2,3]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-2] = 'clsc4'
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc4 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', ])
+
+        # classList setitem [2] to [1,2,3]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[2] = 'clsc4'
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc2 clsc4')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc3', ])
+
+        # classList setitem [-1] to [1,2,3]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-1] = 'clsc4'
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc2 clsc4')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc3', ])
+
+        # classList setitem [1:5]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[1:5] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc4 clsc5')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3', ])
+
+        # classList setitem [-2:5]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-2:5] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc4 clsc5')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3', ])
+
+        # classList setitem [1:]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[1:] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc4 clsc5')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3', ])
+
+        # classList setitem [-2:]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-2:] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc4 clsc5')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3', ])
+
+        # classList setitem [0:2]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[0:2] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc5 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', 'clsc2', ])
+
+        # classList setitem [-3:-1]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-3:-1] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc5 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', 'clsc2', ])
+
+        # classList setitem [:2]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[:2] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc5 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', 'clsc2', ])
+
+        # classList setitem [:-1]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[:-1] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc5 clsc3')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', 'clsc2', ])
+
+        # classList setitem [0:3:2]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[0:3:2] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc2 clsc5')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', 'clsc3', ])
+
+        # classList setitem [-3::2]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-3::2] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc4 clsc2 clsc5')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', 'clsc3', ])
+
+        # classList setitem [2:0:-1]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[2:0:-1] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc5 clsc4')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc3', 'clsc2', ])
+
+        # classList setitem [-1:0:-1]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-1:0:-1] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc1 clsc5 clsc4')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc3', 'clsc2', ])
+
+        # classList setitem [2::-2]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[2::-2] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc5 clsc2 clsc4')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc3', 'clsc1', ])
+
+        # classList setitem [-1::-2]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList[-1::-2] = ['clsc4', 'clsc5', ]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc5 clsc2 clsc4')
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_addClass'], ['clsc4', 'clsc5', ])
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc3', 'clsc1', ])
+
+        # classList set by className
+        elm.className = 'clsc1 clsc2 clsc3  clsc4'
+        self.assertEqual(len(lst), 4)
+        self.assertEqual(elm.className, 'clsc1 clsc2 clsc3 clsc4')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['className'], 'clsc1 clsc2 clsc3  clsc4')
+        # note: no className in dominter.js because className is treated like common properties
+
+        # classList del[0] from [x,y,z,w]
+        del elm.classList[0]
+        self.assertEqual(len(lst), 3)
+        self.assertEqual(elm.className, 'clsc2 clsc3 clsc4')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc1', ])
+
+        # classList del 0,1 from [x,y,z]
+        del elm.classList[0:2]
+        self.assertEqual(len(lst), 1)
+        self.assertEqual(elm.className, 'clsc4')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3',])
+
+        # classList del 1,2,3,4 from [x,y,z]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        del elm.classList[1:5]
+        self.assertEqual(len(lst), 1)
+        self.assertEqual(elm.className, 'clsc1')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3',])
+
+        # classList del -1 from [x,y,z]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        del elm.classList[-1]
+        self.assertEqual(len(lst), 2)
+        self.assertEqual(elm.className, 'clsc1 clsc2')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc3',])
+
+        # classList del -2: from [x,y,z]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        del elm.classList[-2:]
+        self.assertEqual(len(lst), 1)
+        self.assertEqual(elm.className, 'clsc1')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3', ])
+
+        # classList del -2: from [x,y,z]
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        del elm.classList[-2:]
+        self.assertEqual(len(lst), 1)
+        self.assertEqual(elm.className, 'clsc1')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_removeClass'], ['clsc2', 'clsc3', ])
+
+        # classList reverse()
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList.reverse()
+        self.assertEqual(elm.className, 'clsc3 clsc2 clsc1')
+        ddcnt += 0
+        self.assertEqual(len(document.diffdat), ddcnt)
+
+        # classList reverse()
+        elm.className = 'clsc1 clsc2 clsc3'
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        elm.classList.sort()
+        self.assertEqual(elm.className, 'clsc1 clsc2 clsc3')
+        ddcnt += 0
+        self.assertEqual(len(document.diffdat), ddcnt)
+
+        # classList clear()
+        elm.classList.clear()
+        self.assertEqual(elm.className, '')
         self.assertEqual(len(lst), 0)
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_clearClass'], True)
+
         # style
         elm.style.cssText = ''
         ddcnt += 1
