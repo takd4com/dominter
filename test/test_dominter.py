@@ -2226,11 +2226,14 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(ddd['_deleteStyle'], ['margin-left', ])
 
         # style cssText read
-        self.assertEqual(elm.style.cssText, 'color: grey; size: 80;')
+        self.assertTrue(elm.style.cssText=='color: grey; size: 80;' or
+                        elm.style.cssText == 'size: 80; color: grey;')
 
         # style cssText write
         elm.style.cssText = 'color: yellow; z-index: 12;'
-        self.assertEqual(elm.style.cssText, 'color: yellow; z-index: 12;')
+        self.assertTrue(elm.style.cssText == 'color: yellow; z-index: 12;' or
+                        elm.style.cssText == 'z-index: 12; color: yellow;'
+                        )
         self.assertEqual(elm.style, {'color': 'yellow', 'z-index': '12'})
         ddcnt += 3
         self.assertEqual(len(document.diffdat), ddcnt)
