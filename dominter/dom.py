@@ -268,7 +268,6 @@ class Style(dict):
         ik = self.attr2item_key(key)
         return super(Style, self).__contains__(ik)
 
-
     def attr2item_key(self, key):
         s1 = self.re1.sub(r'\1-\2', key)
         return self.re2.sub(r'\1-\2', s1).lower()
@@ -321,6 +320,10 @@ class Style(dict):
                 key = kv[0].strip()
                 value = kv[1].strip()
                 self.__setitem__(key, value)
+            elif 2 < len(kv):
+                key = kv[0].strip()
+                value = ':'.join(kv[1:]).strip()
+                self.__setitem__(key, value)
             else:
                 raise ValueError()
 
@@ -347,13 +350,11 @@ class Element(object):
         self.name = None
         self.parent = None
         self._eventlisteners = []
-        self.attributes = {}
         self._childList = ChildList(self)
         self._classList = ClassList(self)
         self._style = Style(self)
         self._onclick = None
         self._onchange = None
-        self._in_init_ = False
         self._on = 0 # to sort childList
         #self.onblur = None
         #self.onfocus = None
@@ -381,14 +382,17 @@ class Element(object):
         #self.onmouseup = None
         #self.onmousedown = None
         #self.onmousemove = None
+        self._in_init_ = False
 
-    # dif_dat除外
     dif_excepts = ['_in_init_', '_on', 'classList', '_classList', 'style',
                    'childList', '_childList',
                    'parent', 'document',
                    'onclick', '_onclick',
                    'onchange', '_onchange', ]
     ser_excepts = ['_in_init_', '_on', 'parent', 'document', ]
+
+    def _raw_setattr(self, key, value):
+        super(Element, self).__setattr__(key, value)
 
     def _pre_setattr(self, key, value):
         if 'document' in self.__dict__:
@@ -398,6 +402,17 @@ class Element(object):
     def __setattr__(self, key, value):
         self._pre_setattr(key, value)
         super(Element, self).__setattr__(key, value)
+
+    def _raw_delattr(self, key):
+        super(Element, self).__delattr__(key)
+
+    def _pre_delattr(self, key):
+        if (not self._in_init_) and (key not in self.dif_excepts):
+            self.document.add_diff({_OBJKEY_: self._id, '_delattr': [key, ]})
+
+    def __delattr__(self, item):
+        self._pre_delattr(item)
+        super(Element, self).__delattr__(item)
 
     @property
     def id(self):
@@ -468,7 +483,7 @@ class Element(object):
         self._set_onclick(value)
 
     def _set_onclick(self, fnc):
-        self.__dict__['_onclick'] = fnc
+        self._onclick = fnc
         name = self.addhandler(fnc)
         self.document.add_diff({_OBJKEY_: self.id, 'onclick': name})
 
@@ -549,8 +564,8 @@ class Element(object):
             return str(self._style)
         elif 'class' == name:
             return self.className
-        elif name in self.attributes.keys():
-            return self.attributes[name]
+        elif name in self.__dict__:
+            return self.__dict__[name]
 
     def setAttribute(self, name, value):
         if 'style' == name:
@@ -559,7 +574,7 @@ class Element(object):
         elif 'class' == name:
             self.className = value
         else:
-            self.attributes[name] = value
+            self._raw_setattr(name, value)
             self.document.add_diff({_OBJKEY_: self._id, '_setAttributes': {name: value}})
 
     def removeAttribute(self, name):
@@ -567,9 +582,9 @@ class Element(object):
             self._style.clear()
         elif 'class' == name:
             self.className = ''
-        elif name in self.attributes.keys():
-            del(self.attributes[name])
+        elif name in self.__dict__:
             self.document.add_diff({_OBJKEY_: self._id, '_removeAttributes': [name, ]})
+            self._raw_delattr(name)
 
     def addEventListener(self, type_, listener):
         self._eventlisteners.append((type_, listener))
@@ -1263,6 +1278,41 @@ class Document(object):
     def h1(self, textContent, id_=None, accesskey=None, hidden=None,
            tabindex=None, style=None, className=None):
         return self.create_with('h1', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className)
+
+    def h2(self, textContent, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None):
+        return self.create_with('h2', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className)
+
+    def h3(self, textContent, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None):
+        return self.create_with('h3', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className)
+
+    def h4(self, textContent, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None):
+        return self.create_with('h4', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className)
+
+    def h5(self, textContent, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None):
+        return self.create_with('h5', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className)
+
+    def h6(self, textContent, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None):
+        return self.create_with('h6', textContent=textContent,
                                 id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className)

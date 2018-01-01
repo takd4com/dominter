@@ -3,8 +3,8 @@
 (function() {
   var excepts = ['_in_init_', 'tagName', 'document', 'parent',
     '_id', '_objid_', '_classList', '_eventlisteners',
-    'attributes', '_childList', '_onclick', 'onclick', '_onchange', 'onchange',
-    '_setAttributes', '_removeAttributes',
+    '_childList', '_onclick', 'onclick', '_onchange', 'onchange',
+    '_setAttributes', '_removeAttributes', '_delattr',
     '_clearChild', '_reverseChild', '_on',
     '_addClass', '_removeClass', '_clearClass',
     '_setStyle', '_deleteStyle', '_clearStyle',
@@ -202,6 +202,12 @@
         }
         if ('_removeAttributes' in dat) {
           var atrs = dat['_removeAttributes'];
+          for (var key of atrs) {
+            elm.removeAttribute(key);
+          }
+        }
+        if ('_delattr' in dat) {
+          var atrs = dat['_delattr'];
           for (var key of atrs) {
             elm.removeAttribute(key);
           }

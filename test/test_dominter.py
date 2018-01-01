@@ -588,7 +588,7 @@ class TestDominter(unittest.TestCase):
         self.assertIsNone(elm.name)
         self.assertIsNone(elm.parent)
         self.assertEqual(elm._eventlisteners, [])
-        self.assertEqual(elm.attributes, {})
+        #del#self.assertEqual(elm.attributes, {})
         self.assertEqual(type(elm._childList), domdom.ChildList)
         self.assertEqual(type(elm._classList), domdom.ClassList)
         self.assertEqual(type(elm._style), domdom.Style)
@@ -2115,7 +2115,19 @@ class TestDominter(unittest.TestCase):
         # style
         elm.style.cssText = ''
         ddcnt += 1
-        #
+
+        # style setitem getitem
+        elm.style['color'] = 'grey'
+        self.assertEqual(len(elm.style), 1)
+        self.assertEqual(elm.style.color, 'grey')
+        self.assertEqual(elm.style['color'], 'grey')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_setStyle'], {'color': 'grey'})
+
+        # style setattr getattr
         elm.style.color = 'red'
         self.assertEqual(len(elm.style), 1)
         self.assertEqual(elm.style.color, 'red')
@@ -2125,7 +2137,8 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_setStyle'], {'color': 'red'})
-        #
+
+        # style attr2item_key
         elm.style.zIndex = 3
         self.assertEqual(len(elm.style), 2)
         self.assertEqual(elm.style.zIndex, 3)
@@ -2136,8 +2149,53 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_setStyle'], {'z-index': 3})
-        #
-        elm.style['color'] = 'grey'
+
+        # style contains
+        self.assertFalse('size' in elm.style)
+        elm.style.size = 80
+        self.assertTrue('size' in elm.style)
+        self.assertEqual(len(elm.style), 3)
+        self.assertEqual(elm.style.size, 80)
+        self.assertEqual(elm.style['size'], 80)
+        self.assertTrue('z-index' in elm.style)
+        self.assertTrue('zIndex' in elm.style)
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_setStyle'], {'size': 80})
+
+        # style delitem
+        self.assertFalse('marginLeft' in elm.style)
+        self.assertFalse('margin-left' in elm.style)
+        elm.style['margin-left'] = 5
+        self.assertEqual(len(elm.style), 4)
+        ddcnt += 1
+        self.assertTrue('marginLeft' in elm.style)
+        self.assertTrue('margin-left' in elm.style)
+        self.assertEqual(elm.style.marginLeft, 5)
+        self.assertEqual(elm.style['margin-left'], 5)
+        del elm.style['margin-left']
+        self.assertEqual(len(elm.style), 3)
+        self.assertFalse('marginLeft' in elm.style)
+        self.assertFalse('margin-left' in elm.style)
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_deleteStyle'], ['margin-left', ])
+        del elm.style.zIndex
+        self.assertEqual(len(elm.style), 2)
+        self.assertFalse('xIndex' in elm.style)
+        self.assertFalse('z-index' in elm.style)
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_deleteStyle'], ['z-index', ])
+
+        # style setProperty 1
+        elm.style.setProperty('color', 'grey')
         self.assertEqual(len(elm.style), 2)
         self.assertEqual(elm.style.color, 'grey')
         self.assertEqual(elm.style['color'], 'grey')
@@ -2146,14 +2204,34 @@ class TestDominter(unittest.TestCase):
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_setStyle'], {'color': 'grey'})
-        #
-        elm.style = 'color: green; z-index: 11'
+
+        # style setProperty 2
+        elm.style.setProperty('margin-left', '20')
+        self.assertEqual(len(elm.style), 3)
+        self.assertEqual(elm.style.marginLeft, '20')
+        self.assertEqual(elm.style['margin-left'], '20')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_setStyle'], {'margin-left': '20'})
+
+        # style removeProperty
+        elm.style.removeProperty('margin-left')
         self.assertEqual(len(elm.style), 2)
-        self.assertEqual(elm.style.color, 'green')
-        self.assertEqual(elm.style['color'], 'green')
-        self.assertEqual(elm.style.zIndex, '11')
-        self.assertEqual(elm.style['z-index'], '11')
-        self.assertEqual(elm.style['zIndex'], '11')
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_deleteStyle'], ['margin-left', ])
+
+        # style cssText read
+        self.assertEqual(elm.style.cssText, 'color: grey; size: 80;')
+
+        # style cssText write
+        elm.style.cssText = 'color: yellow; z-index: 12;'
+        self.assertEqual(elm.style.cssText, 'color: yellow; z-index: 12;')
+        self.assertEqual(elm.style, {'color': 'yellow', 'z-index': '12'})
         ddcnt += 3
         self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 3]
@@ -2161,10 +2239,34 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(ddd['_clearStyle'], True)
         ddd = document.diffdat[ddcnt - 2]
         self.assertEqual(ddd['_objid_'], id1)
-        self.assertEqual(ddd['_setStyle'], {'color': 'green'})
+        self.assertEqual(ddd['_setStyle'], {'color': 'yellow'})
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_setStyle'], {'z-index': '12'})
+
+        # style set
+        elm.style = 'color: green; z-index: 11; special: a:b:c:de: ;'
+        self.assertEqual(len(elm.style), 3)
+        self.assertEqual(elm.style.color, 'green')
+        self.assertEqual(elm.style['color'], 'green')
+        self.assertEqual(elm.style.zIndex, '11')
+        self.assertEqual(elm.style['z-index'], '11')
+        self.assertEqual(elm.style['zIndex'], '11')
+        self.assertEqual(elm.style.special, 'a:b:c:de:')
+        ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 4]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_clearStyle'], True)
+        ddd = document.diffdat[ddcnt - 3]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_setStyle'], {'color': 'green'})
+        ddd = document.diffdat[ddcnt - 2]
+        self.assertEqual(ddd['_objid_'], id1)
         self.assertEqual(ddd['_setStyle'], {'z-index': '11'})
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], id1)
+        self.assertEqual(ddd['_setStyle'], {'special': 'a:b:c:de:'})
 
     def test_Element2(self):
         win = Window()
@@ -2188,6 +2290,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[0], chd)
         self.assertEqual(chd.parent, elm)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_appendChild'], chd.id)
@@ -2195,6 +2298,7 @@ class TestDominter(unittest.TestCase):
         elm.removeChild(chd)
         self.assertEqual(len(elm.childList), 0)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_removeChild'], chd.id)
@@ -2206,6 +2310,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[0], chd2)
         self.assertEqual(elm.childList[1], chd)
         ddcnt += 4
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 4]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_appendChild'], chd.id)
@@ -2231,11 +2336,12 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm2.childList[0], chd)
 
         elm.appendChild(chd)
-        ddcnt += 2
         self.assertEqual(len(elm.childList), 2)
         self.assertEqual(elm.childList[0], chd2)
         self.assertEqual(elm.childList[1], chd)
         self.assertEqual(len(elm2.childList), 0)
+        ddcnt += 2
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 2]
         self.assertEqual(ddd['_objid_'], elm2.id)
         self.assertEqual(ddd['_removeChild'], chd.id)
@@ -2253,6 +2359,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[1], chd2)
         self.assertEqual(elm.childList[2], chd)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_insertBefore'], [chd3.id, chd2.id])
@@ -2264,6 +2371,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[2], chd4)
         self.assertEqual(elm.childList[3], chd)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_insertBefore'], [chd4.id, chd.id])
@@ -2278,11 +2386,13 @@ class TestDominter(unittest.TestCase):
         #elm.appendChild(chd)
         elm.insertBefore(chd, None)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_appendChild'], chd.id)
         elm.insertBefore(chd2, chd)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(len(elm.childList), 2)
         self.assertEqual(elm.childList[0], chd2)
@@ -2297,6 +2407,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[1], chd)
         self.assertEqual(elm.childList[2], chd3)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_appendChild'], chd3.id)
@@ -2308,6 +2419,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[1], chd4)
         self.assertEqual(elm.childList[2], chd3)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_replaceChild'], [chd4.id, chd.id])
@@ -2318,6 +2430,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[0], chd4)
         self.assertEqual(elm.childList[1], chd2)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_replaceChild'], [chd2.id, chd3.id])
@@ -2328,6 +2441,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[0], chd3)
         self.assertEqual(elm.childList[1], chd2)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_replaceChild'], [chd3.id, chd4.id])
@@ -2338,6 +2452,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.childList[0], chd3)
         self.assertEqual(elm.childList[1], chd4)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_replaceChild'], [chd4.id, chd2.id])
@@ -2347,16 +2462,52 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(len(elm.childList), 1)
         self.assertEqual(elm.childList[0], chd4)
         ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
         ddd = document.diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_replaceChild'], [chd4.id, chd3.id])
-
-        ###elm.removeChild(chd2)
 
     def test_Element3(self):
         win = Window()
         document = win.document
         elm = document.createElement('elmtag')
+        ddcnt = 1
+        # setAttribute() getAttribute 1
+        elm.setAttribute('abc', 1234)
+        v = elm.getAttribute('abc')
+        self.assertEqual(v, 1234)
+        self.assertTrue('abc' in elm.__dict__)
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], elm.id)
+        self.assertEqual(ddd['_setAttributes'], {'abc': 1234})
+
+        # setAttribute() getAttribute 2
+        elm.setAttribute('def', 567)
+        v = elm.getAttribute('def')
+        self.assertEqual(v, 567)
+        self.assertTrue('def' in elm.__dict__)
+        v = elm.getAttribute('abc')
+        self.assertEqual(v, 1234)
+        self.assertTrue('abc' in elm.__dict__)
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], elm.id)
+        self.assertEqual(ddd['_setAttributes'], {'def': 567})
+
+        # removeAttribute()
+        elm.removeAttribute('abc')
+        v = elm.getAttribute('abc')
+        self.assertEqual(v, None)
+        v = elm.getAttribute('def')
+        self.assertEqual(v, 567)
+        ddcnt += 1
+        self.assertEqual(len(document.diffdat), ddcnt)
+        ddd = document.diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], elm.id)
+        self.assertEqual(ddd['_removeAttributes'], ['abc', ])
 
 
 if __name__ == "__main__":

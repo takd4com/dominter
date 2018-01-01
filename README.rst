@@ -9,7 +9,7 @@ Features
 * Supports 'click', 'change' and any events.
 * Supports multiple window.
 * Supports both multiple-instance and single-instance.
-* Supports Element.class and Element.style properties.
+* Supports Element.className and Element.style properties.
 
 Installation
 ------------
@@ -75,15 +75,13 @@ Example
     win = Window()
     document = win.document
     # js like
-    p0 = document.createElement('p')
-    p0.textContent = 'by createElement() '
+    p1 = document.createElement('p')
+    p1.textContent = 'by createElement() '
     # html like : specify all by text excepts event handler
-    p1 = document.tag('p _="by tag() "')  # use '_=' for textContent
+    p2 = document.tag('p _="by tag() "')  # use '_=' for textContent
     # individual tag method
-    p2 = document.p('by p() method. ')
-    document.body.appendChild(p0)
-    document.body.appendChild(p1)
-    document.body.appendChild(p2)
+    p3 = document.p('by p() method. ')
+    document.body.childList.Expand([p1, p2, p3])
     start_app(win)
 
 Individual tag methods:
@@ -93,7 +91,8 @@ text, checkbox, radio, color,
 date, month, time, week, number,
 password, range, select, option,
 textarea, table, tr, th, td,
-fieldset, legend, img, a
+fieldset, legend, img, a, label,
+h1, h2, h3, h4, h5, h6, ol, li, ul, section, header, footer
 
 
 * multiple window
@@ -107,8 +106,8 @@ fieldset, legend, img, a
             super(MyWindow1, self).__init__()
             document = self.document
             self.txt1 = document.text('windows1')
-            document.body.appendChild(self.txt1)
             self.btn1 = document.button('test1', onclick=self.on_btn1)
+            document.body.appendChild(self.txt1)
             document.body.appendChild(self.btn1)
 
         def on_btn1(self, ev):
@@ -119,8 +118,8 @@ fieldset, legend, img, a
             super(MyWindow2, self).__init__()
             document = self.document
             self.txt1 = document.text('windows2')
-            document.body.appendChild(self.txt1)
             self.btn1 = document.button('test1', onclick=self.on_btn1)
+            document.body.appendChild(self.txt1)
             document.body.appendChild(self.btn1)
 
         def on_btn1(self, ev):
@@ -140,8 +139,8 @@ fieldset, legend, img, a
             super(MyWindow1, self).__init__()
             document = self.document
             self.txt1 = document.text('windows1')
-            document.body.appendChild(self.txt1)
             self.btn1 = document.button('test1', onclick=self.on_btn1)
+            document.body.appendChild(self.txt1)
             document.body.appendChild(self.btn1)
 
         def on_btn1(self, ev):
@@ -152,8 +151,8 @@ fieldset, legend, img, a
             super(MyWindow2, self).__init__()
             document = self.document
             self.txt1 = document.text('windows2')
-            document.body.appendChild(self.txt1)
             self.btn1 = document.button('test1', onclick=self.on_btn1)
+            document.body.appendChild(self.txt1)
             document.body.appendChild(self.btn1)
 
         def on_btn1(self, ev):
@@ -168,5 +167,5 @@ Status
 Pre-alpha
 
 
-| Copyright (c) 2017 Tamini Bean
+| Copyright (c) 2017-2018 Tamini Bean
 | License: MIT
