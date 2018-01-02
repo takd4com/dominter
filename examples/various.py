@@ -174,7 +174,7 @@ class MyWindow(Window):
         self.inputs_btn = document.button('inputs', onclick=self.on_inputs_btn)
         add_body(self.inputs_btn)
         br()
-        document.clean_diff()
+        document._clean_diff()
 
     def on_btn1(self, ev):
         self.txt1.value = 'modified'

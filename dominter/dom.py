@@ -397,7 +397,7 @@ class Element(object):
     def _pre_setattr(self, key, value):
         if 'document' in self.__dict__:
             if (not self._in_init_) and (key not in self.dif_excepts):
-                self.document.add_diff({_OBJKEY_: self._id, key: value})
+                self.document._add_diff({_OBJKEY_: self._id, key: value})
 
     def __setattr__(self, key, value):
         self._pre_setattr(key, value)
@@ -408,7 +408,7 @@ class Element(object):
 
     def _pre_delattr(self, key):
         if (not self._in_init_) and (key not in self.dif_excepts):
-            self.document.add_diff({_OBJKEY_: self._id, '_delattr': [key, ]})
+            self.document._add_diff({_OBJKEY_: self._id, '_delattr': [key, ]})
 
     def __delattr__(self, item):
         self._pre_delattr(item)
@@ -425,7 +425,7 @@ class Element(object):
     def _set_id(self, txt):
         orgid = self._id
         self.__dict__['_id'] = txt
-        objdic = self.document.obj_dic
+        objdic = self.document._obj_dic
         if orgid in objdic:
             del(objdic[orgid])
         objdic[txt] = self
@@ -469,9 +469,9 @@ class Element(object):
     def style(self, value):
         self._style.cssText = value
 
-    def addhandler(self, fnc):
+    def _addhandler(self, fnc):
         name = repr(fnc)
-        self.document.handlers[name] = fnc
+        self.document._handlers[name] = fnc
         return name
 
     @property
@@ -484,8 +484,8 @@ class Element(object):
 
     def _set_onclick(self, fnc):
         self._onclick = fnc
-        name = self.addhandler(fnc)
-        self.document.add_diff({_OBJKEY_: self.id, 'onclick': name})
+        name = self._addhandler(fnc)
+        self.document._add_diff({_OBJKEY_: self.id, 'onclick': name})
 
     @property
     def onchange(self):
@@ -496,14 +496,14 @@ class Element(object):
         self._set_onchange(value)
 
     def _set_onchange(self, fnc):
-        self.__dict__['_onchange'] = fnc
-        name = self.addhandler(fnc)
-        self.document.add_diff({_OBJKEY_: self._id, 'onchange': name})
+        self._onchange = fnc
+        name = self._addhandler(fnc)
+        self.document._add_diff({_OBJKEY_: self._id, 'onchange': name})
 
     def removeChild(self, elm):
         if elm not in self._childList:
             raise ValueError('not child')
-        self.document.add_diff({_OBJKEY_: self._id, '_removeChild': elm.id})
+        self.document._add_diff({_OBJKEY_: self._id, '_removeChild': elm.id})
         elm.parent = None
         self._childList._raw_remove(elm)
 
@@ -512,7 +512,7 @@ class Element(object):
             elm.parent.removeChild(elm)
         self.childList._raw_append(elm)
         elm.parent = self
-        self.document.add_diff({_OBJKEY_: self._id, '_appendChild': elm.id})
+        self.document._add_diff({_OBJKEY_: self._id, '_appendChild': elm.id})
         # check childList recursively
         if 0 == len(elm._childList):
             return
@@ -526,7 +526,7 @@ class Element(object):
                 break
             if chd.parent is None:
                 chd.parent = parent
-                self.document.add_diff({_OBJKEY_: parent._id, '_appendChild': chd.id})
+                self.document._add_diff({_OBJKEY_: parent._id, '_appendChild': chd.id})
             for gson in chd.childList:
                 que.append((chd, gson))
 
@@ -543,7 +543,7 @@ class Element(object):
             pos = self.childList.index(ref_elm)
             self.childList._raw_insert(pos, new_elm)
             new_elm.parent = self
-            self.document.add_diff({_OBJKEY_: self._id, '_insertBefore': [new_elm._id, ref_elm._id]})
+            self.document._add_diff({_OBJKEY_: self._id, '_insertBefore': [new_elm._id, ref_elm._id]})
 
     def replaceChild(self, new_elm, old_elm):
         if old_elm is None:
@@ -557,7 +557,7 @@ class Element(object):
             old_elm.parent = None
             self.childList._raw_insert(pos, new_elm)
             new_elm.parent = self
-            self.document.add_diff({_OBJKEY_: self._id, '_replaceChild': [new_elm._id, old_elm._id]})
+            self.document._add_diff({_OBJKEY_: self._id, '_replaceChild': [new_elm._id, old_elm._id]})
 
     def getAttribute(self, name):
         if 'style' == name:
@@ -575,7 +575,7 @@ class Element(object):
             self.className = value
         else:
             self._raw_setattr(name, value)
-            self.document.add_diff({_OBJKEY_: self._id, '_setAttributes': {name: value}})
+            self.document._add_diff({_OBJKEY_: self._id, '_setAttributes': {name: value}})
 
     def removeAttribute(self, name):
         if 'style' == name:
@@ -583,21 +583,21 @@ class Element(object):
         elif 'class' == name:
             self.className = ''
         elif name in self.__dict__:
-            self.document.add_diff({_OBJKEY_: self._id, '_removeAttributes': [name, ]})
+            self.document._add_diff({_OBJKEY_: self._id, '_removeAttributes': [name, ]})
             self._raw_delattr(name)
 
     def addEventListener(self, type_, listener):
         self._eventlisteners.append((type_, listener))
-        self.document.add_diff({_OBJKEY_: self._id, '_addEventListener': [listener, ]})
-        self.addhandler(listener)
+        self.document._add_diff({_OBJKEY_: self._id, '_addEventListener': [type_, repr(listener), ]})
+        self._addhandler(listener)
 
     def removeEventListener(self, type_, listener):
         tpl = (type_, listener)
         if tpl in self._eventlisteners:
             self._eventlisteners.remove(tpl)
-            self.document.add_diff({_OBJKEY_: self._id, '_removeEventListener': [listener, ]})
             name = repr(listener)
-            del(self.document.handlers[name])
+            self.document._add_diff({_OBJKEY_: self._id, '_removeEventListener': [type_, name, ]})
+            del(self.document._handlers[name])
 
     def dumps(self):
         # self.onload()
@@ -722,7 +722,7 @@ class Element(object):
         return False
 
     def _childList_reverse(self):
-        self.document.add_diff({_OBJKEY_: self._id, '_reverseChild': True})
+        self.document._add_diff({_OBJKEY_: self._id, '_reverseChild': True})
         return True
 
     def _childList_sort(self, key=None, reverse=False):
@@ -730,35 +730,35 @@ class Element(object):
             elm._on = j
         self.childList._raw_sort(key=key, reverse=reverse)
         ordr = list([elm._on for elm in self.childList])
-        self.document.add_diff({_OBJKEY_: self._id, '_sortChild': ordr})
+        self.document._add_diff({_OBJKEY_: self._id, '_sortChild': ordr})
         return False
 
     def _childList_clear(self):
-        self.document.add_diff({_OBJKEY_: self._id, '_clearChild': True})
+        self.document._add_diff({_OBJKEY_: self._id, '_clearChild': True})
         for elm in self.childList:
             elm.parent = None
         return True
 
     def _classList_append(self, txt):
-        self.document.add_diff({_OBJKEY_: self._id, '_addClass': [txt, ]})
+        self.document._add_diff({_OBJKEY_: self._id, '_addClass': [txt, ]})
         return True
 
     def _classList_insert(self, index, txt):
-        self.document.add_diff({_OBJKEY_: self._id, '_addClass': [txt, ]})
+        self.document._add_diff({_OBJKEY_: self._id, '_addClass': [txt, ]})
         return True
 
     def _classList_extend(self, lst):
-        self.document.add_diff({_OBJKEY_: self._id, '_addClass': lst})
+        self.document._add_diff({_OBJKEY_: self._id, '_addClass': lst})
         return True
 
     def _classList_remove(self, txt):
-        self.document.add_diff({_OBJKEY_: self._id, '_removeClass': [txt, ]})
+        self.document._add_diff({_OBJKEY_: self._id, '_removeClass': [txt, ]})
         return True
 
     def _classList_pop(self, idx):
         if 0 <= idx < len(self._classList):
             txt = self._classList[idx]
-            self.document.add_diff({_OBJKEY_: self._id, '_removeClass': [txt, ]})
+            self.document._add_diff({_OBJKEY_: self._id, '_removeClass': [txt, ]})
         return True, None
 
     def _classList_setitem(self, idx, value):
@@ -766,20 +766,20 @@ class Element(object):
             elm = self._classList[idx]
             if not isinstance(value, str):
                 raise TypeError('can only assign an str')
-            self.document.add_diff({_OBJKEY_: self._id, '_addClass': [value, ]})
+            self.document._add_diff({_OBJKEY_: self._id, '_addClass': [value, ]})
             if elm:
-                self.document.add_diff({_OBJKEY_: self._id, '_removeClass': [elm, ]})
+                self.document._add_diff({_OBJKEY_: self._id, '_removeClass': [elm, ]})
         elif isinstance(idx, slice):
             lst = self._classList[idx]
             if (not isinstance(value, list)) and (not isinstance(value, tuple)):
                 raise TypeError('can only assign an iterable')
             if 0 == len(lst):
                 for elm in value:
-                    self.document.add_diff({_OBJKEY_: self._id, '_addClass': elm})
+                    self.document._add_diff({_OBJKEY_: self._id, '_addClass': elm})
             else:
                 ref = lst[0]
-                self.document.add_diff({_OBJKEY_: self._id, '_addClass': value})
-                self.document.add_diff({_OBJKEY_: self._id, '_removeClass': lst})
+                self.document._add_diff({_OBJKEY_: self._id, '_addClass': value})
+                self.document._add_diff({_OBJKEY_: self._id, '_removeClass': lst})
         else:
             raise TypeError('bad value type')
         return True
@@ -789,23 +789,23 @@ class Element(object):
         if lst:
             if isinstance(lst, str):
                 lst = [lst,]
-            self.document.add_diff({_OBJKEY_: self._id, '_removeClass': lst})
+            self.document._add_diff({_OBJKEY_: self._id, '_removeClass': lst})
         return True
 
     def _classList_clear(self):
-        self.document.add_diff({_OBJKEY_: self._id, '_clearClass': True})
+        self.document._add_diff({_OBJKEY_: self._id, '_clearClass': True})
         return True
 
     def _style_set(self, key, value):
-        self.document.add_diff({_OBJKEY_: self._id, '_setStyle': {key: value}})
+        self.document._add_diff({_OBJKEY_: self._id, '_setStyle': {key: value}})
         return True
 
     def _style_delete(self, key):
-        self.document.add_diff({_OBJKEY_: self._id, '_deleteStyle': [key, ]})
+        self.document._add_diff({_OBJKEY_: self._id, '_deleteStyle': [key, ]})
         return True
 
     def _style_clear(self):
-        self.document.add_diff({_OBJKEY_: self._id, '_clearStyle': True})
+        self.document._add_diff({_OBJKEY_: self._id, '_clearStyle': True})
         return True
 
 
@@ -815,43 +815,43 @@ class Document(object):
     """
     def __init__(self):
         #super().__init__('document')
-        self.dirty = True
-        self.obj_dic = {}
-        self.diffdat = []
-        self.handlers = {}
+        self._dirty = True
+        self._obj_dic = {}
+        self._diffdat = []
+        self._handlers = {}
         self.head = Element(self, 'head')
         self.body = Element(self, 'body')
-        self.cache = None
+        self._cache = None
 
-    def clean_diff(self):
-        self.diffdat = []
+    def _clean_diff(self):
+        self._diffdat = []
 
-    def add_diff(self, dat):
-        self.dirty = True
-        self.diffdat.append(dat)
+    def _add_diff(self, dat):
+        self._dirty = True
+        self._diffdat.append(dat)
 
     def getElementById(self, eid):
         if isinstance(eid, int):
             eid = str(eid)
-        return self.obj_dic.get(eid, None)
+        return self._obj_dic.get(eid, None)
 
     def getElementsByName(self, name):
-        return [elm for key, elm in self.obj_dic.items()
+        return [elm for key, elm in self._obj_dic.items()
                 if elm.name == name]
 
     def getElementsByTagName(self, tag):
-        return [elm for key, elm in self.obj_dic.items()
+        return [elm for key, elm in self._obj_dic.items()
                 if elm.tagName == tag]
 
     def getElementsByClassName(self, cls):
-        return [elm for key, elm in self.obj_dic.items()
+        return [elm for key, elm in self._obj_dic.items()
                 if cls in elm.classList]
 
     def createElement(self, tag):
         elm = Element(self, tag)
         dat = elm.dumps()
-        self.add_diff({_OBJKEY_: elm._id, '_createElement': dat})
-        self.obj_dic[elm._id] = elm
+        self._add_diff({_OBJKEY_: elm._id, '_createElement': dat})
+        self._obj_dic[elm._id] = elm
         return elm
 
     """ not supported. use span
@@ -1374,13 +1374,13 @@ class Window(object):
         #self.name = ''
 
     def _dumps(self):
-        if self.document.dirty:
+        if self.document._dirty:
             logger.debug('create cache')
             s = json.dumps(self.document, default=self._serializer, indent=2)
-            self.document.cache = s
-            self.document.dirty = False
+            self.document._cache = s
+            self.document._dirty = False
         else:
-            s = self.document.cache
+            s = self.document._cache
         return s
 
     @staticmethod
@@ -1466,7 +1466,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         logger.debug('id: {} type:{}'.format(id_, type_))
         # system handler
         if 'change' == type_:
-            objdic = self.window.document.obj_dic
+            objdic = self.window.document._obj_dic
             if id_ in objdic:
                 obj = objdic[id_]
                 if 'value' in dic:
@@ -1487,16 +1487,16 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         # user handler
         if self.window is not None:
             doc = self.window.document
-            if id_ in self.window.document.handlers:
-                fnc = self.window.document.handlers[id_]
+            if id_ in self.window.document._handlers:
+                fnc = self.window.document._handlers[id_]
                 if callable(fnc):
-                    doc.clean_diff()
+                    doc._clean_diff()
                     fnc(dic)
-                    if 0 < len(doc.diffdat):
-                        # self.write_message({'diff': doc.diffdat})
-                        logger.debug('broadcast diff: {}'.format(len(doc.diffdat)))
-                        self.broadcast({'diff': doc.diffdat})
-                        doc.clean_diff()
+                    if 0 < len(doc._diffdat):
+                        # self.write_message({'diff': doc._diffdat})
+                        logger.debug('broadcast diff: {}'.format(len(doc._diffdat)))
+                        self.broadcast({'diff': doc._diffdat})
+                        doc._clean_diff()
 
     def broadcast(self, msg):
         cnt = 0

@@ -14,6 +14,8 @@
   ];
   var headId, bodyId;
 
+  var handlerDic = {};
+
   var createEventHandler = function(ws, type_, id_) {
     var handler = function(ev) {
       var dic = {'id': id_};
@@ -48,10 +50,20 @@
       ws.send(js);
       return true;
     };
+    handlerDic[id_] = handler;
     return handler;
   };
 
-  var newElement = function(dat) {
+  var removeEventHandler = function(elm, type_, id_) {
+    if (handlerDic[id_]) {
+      var handler = handlerDic[id_];
+      elm.removeEventListener(type_, handler);
+      return true;
+    }
+    return false;
+  }
+
+  var newElement = function(ws, dat) {
     var tagname = dat['tagName'];
     var elm = document.createElement(tagname);
     if (dat['_id'] !== undefined) {
@@ -125,7 +137,7 @@
       }
       else {
         //elm = document.createElement(tagname);
-        elm = newElement(dat)
+        elm = newElement(ws, dat)
       }
       if (dat._childList) {
         appendElements(ws, elm, dat._childList);
@@ -160,7 +172,7 @@
     return res;
   };
 
-  var diffproc = function(dic, name) {
+  var diffproc = function(ws, dic, name) {
     var newdic = {};
     for (var dat of dic[name]) {
       var objid = dat['_objid_'];
@@ -325,20 +337,32 @@
             }
           }
         }
+        if ('_addEventListener' in dat) {
+          var lst = dat['_addEventListener'];
+          var typ = lst[0];
+          var fnc = lst[1];
+          elm.addEventListener(typ, createEventHandler(ws, typ, fnc), false);
+        }
+        if ('_removeEventListener' in dat) {
+          var lst = dat['_addEventListener'];
+          var typ = lst[0];
+          var fnc = lst[1];
+          removeEventHandler(elm, typ, fnc);
+        }
       }
       if ('_createElement' in dat) {
         var d = dat['_createElement'];
         if (d) {
           var newdat = JSON.parse(d);
           var newid = newdat['_id'];
-          var newelm = newElement(newdat);
+          var newelm = newElement(ws, newdat);
           newdic[newid] = newelm;
         }
       }
     }
   };
 
-  var typeproc = function(dic) {
+  var typeproc = function(ws, dic) {
     var id = dic['id'];
     var elm = document.getElementById(id);
     if (!elm) {
@@ -377,10 +401,10 @@
       bodyId = body._id;
     }
     if ('diff' in dic) {
-      diffproc(dic, 'diff');
+      diffproc(ws, dic, 'diff');
     }
     if ('type' in dic) {
-      typeproc(dic);
+      typeproc(ws, dic);
     }
   };
 })();
