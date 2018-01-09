@@ -355,7 +355,7 @@ class Element(object):
         self._style = Style(self)
         self._onclick = None
         self._onchange = None
-        self._on = 0 # to sort childList
+        self._sortorder = 0 # to sort childList
         #self.onblur = None
         #self.onfocus = None
         #self.onclose = None
@@ -384,12 +384,11 @@ class Element(object):
         #self.onmousemove = None
         self._in_init_ = False
 
-    dif_excepts = ['_in_init_', '_on', 'classList', '_classList', 'style',
+    dif_excepts = ['_in_init_', '_sortorder', 'classList', '_classList', 'style',
                    'childList', '_childList',
                    'parent', 'document',
-                   'onclick', '_onclick',
-                   'onchange', '_onchange', ]
-    ser_excepts = ['_in_init_', '_on', 'parent', 'document', ]
+                   'onclick', '_onclick', 'onchange', '_onchange', ]
+    ser_excepts = ['_in_init_', '_sortorder', 'parent', 'document', ]
 
     def _raw_setattr(self, key, value):
         super(Element, self).__setattr__(key, value)
@@ -599,18 +598,17 @@ class Element(object):
             self.document._add_diff({_OBJKEY_: self._id, '_removeEventListener': [type_, name, ]})
             del(self.document._handlers[name])
 
-    def dumps(self):
+    def _dumps(self):
         # self.onload()
-        str = json.dumps(self, default=self.serializer, indent=2)
+        str = json.dumps(self, default=self._serializer, indent=2)
         # print(str)
         return str
 
     @staticmethod
-    def serializer(obj):
+    def _serializer(obj):
         if isinstance(obj, Element):
             dic = obj.__dict__.copy()
             # delete reference to other elements to avoid circular reference
-            # 他のelementへの参照を含めるてしまうと循環参照エラーが発生するため削除する
             for nm in Element.ser_excepts:
                 del (dic[nm])
             items = list(dic.items())
@@ -627,7 +625,6 @@ class Element(object):
         elif isinstance(obj, Style):
             dic = obj.__dict__.copy()
             # delete reference to other elements to avoid circular reference
-            # 他のelementへの参照を含めるてしまうと循環参照エラーが発生するため削除する
             del (dic['elm'])
             return dic
         elif callable(obj):
@@ -727,9 +724,9 @@ class Element(object):
 
     def _childList_sort(self, key=None, reverse=False):
         for j, elm in enumerate(self.childList):
-            elm._on = j
+            elm._sortorder = j
         self.childList._raw_sort(key=key, reverse=reverse)
-        ordr = list([elm._on for elm in self.childList])
+        ordr = list([elm._sortorder for elm in self.childList])
         self.document._add_diff({_OBJKEY_: self._id, '_sortChild': ordr})
         return False
 
@@ -814,7 +811,6 @@ class Document(object):
     virtual document class
     """
     def __init__(self):
-        #super().__init__('document')
         self._dirty = True
         self._obj_dic = {}
         self._diffdat = []
@@ -825,6 +821,7 @@ class Document(object):
 
     def _clean_diff(self):
         self._diffdat = []
+        self._dirty = False
 
     def _add_diff(self, dat):
         self._dirty = True
@@ -849,7 +846,7 @@ class Document(object):
 
     def createElement(self, tag):
         elm = Element(self, tag)
-        dat = elm.dumps()
+        dat = elm._dumps()
         self._add_diff({_OBJKEY_: elm._id, '_createElement': dat})
         self._obj_dic[elm._id] = elm
         return elm
@@ -859,14 +856,13 @@ class Document(object):
         pass
     """
 
-    def tag(self, tagtxt, textContent=None, innerHTML=None, attrs=None,
+    def tag(self, tagtxt, textContent=None, attrs=None,
             onclick=None, onchange=None, handler=None, childList=None):
         """
         create a tag with a specification method similar to html.
 
         :param tagtxt:
         :param textContent:
-        :param innerHTML:
         :param attrs:
         :param onclick:
         :param onchange:
@@ -886,7 +882,7 @@ class Document(object):
             d = p.split('=')
             if 1 == len(d):
                 # like readonly. set true
-                elm.__dict__[d] = True
+                elm.__dict__[d[0]] = True
             else:
                 if 2 == len(d):
                     k, v = d
@@ -907,17 +903,15 @@ class Document(object):
                     elm.__dict__[k] = v
         if textContent is not None:
             elm.textContent = textContent
-        if innerHTML is not None:
-            elm.innerHTML = innerHTML
         if attrs is not None:
-            for key, val in attrs:
-                if val is not None:
-                    elm.setAttribute(key, val)
+            for key, val in attrs.items():
+                elm.setAttribute(key, val)
         if onclick is not None:
             elm.onclick = onclick
         if onchange is not None:
             elm.onchange = onchange
-        self.add_handler(elm, handler)
+        if handler is not None:
+            self.add_handler(elm, handler)
         if childList is not None:
             if isinstance(childList, list) or isinstance(childList, tuple):
                 elm._childList = ChildList(elm, childList)
@@ -1036,18 +1030,10 @@ class Document(object):
         if onchange is not None:
             elm.onchange = onchange
         self.add_handler(elm, handler)
-
         return elm
 
-    @staticmethod
-    def filter_none(lst):
-        res = []
-        for key, val in lst:
-            if val is not None:
-                res[key] = val
-
-    def title(self, text, id_=None):
-        return self.create_with('title', textContent=text, id_=id_)
+    def title(self, textContent, id_=None):
+        return self.create_with('title', textContent=textContent, id_=id_)
 
     def style(self, textContent, type_='text/css', media=None, scoped=None, id_=None):
         return self.create_with('style', textContent=textContent, type_=type_,
@@ -1057,9 +1043,9 @@ class Document(object):
         return self.create_with('link', href=href, rel=rel, integrity=integrity,
                                 media=media, id_=id_)
 
-    def script(self, textContent='', type='text/javascript', src=None,
+    def script(self, textContent='', type_='text/javascript', src=None,
                crossorigin=None, id_=None):
-        return self.create_with('script', textContent=textContent, type_=type,
+        return self.create_with('script', textContent=textContent, type_=type_,
                                 src=src, crossorigin=crossorigin, id_=id_)
 
     def br(self, id_=None):
@@ -1085,14 +1071,6 @@ class Document(object):
         return self.create_with('button', textContent=textContent,
                                 type_=type_, name=name, value=value,
                                 disabled=disabled, onclick=onclick,
-                                id_=id_, style=style, className=className)
-
-    def input(self, value='', onchange=None,
-             readonly=None, disabled=None, placeholder=None,
-             id_=None, style=None, className=None):
-        return self.create_with('input', value=value,
-                                onchange=onchange, readonly=readonly,
-                                disabled=disabled, placeholder=placeholder,
                                 id_=id_, style=style, className=className)
 
     def text(self, value='', type_='text', onchange=None,
@@ -1317,17 +1295,9 @@ class Document(object):
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className)
 
-    def ol(self, textContent=None, id_=None, accesskey=None, hidden=None,
+    def ol(self, id_=None, accesskey=None, hidden=None,
            tabindex=None, style=None, className=None, childList=None):
-        return self.create_with('ol', textContent=textContent,
-                                id_=id_, accesskey=accesskey,
-                                hidden=hidden, tabindex=tabindex,
-                                style=style, className=className,
-                                childList=childList)
-
-    def li(self, textContent=None, id_=None, accesskey=None, hidden=None,
-           tabindex=None, style=None, className=None, childList=None):
-        return self.create_with('li', textContent=textContent,
+        return self.create_with('ol',
                                 id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
@@ -1335,7 +1305,16 @@ class Document(object):
 
     def ul(self, id_=None, accesskey=None, hidden=None, tabindex=None,
                 style=None, className=None, childList=None):
-        return self.create_with('ul', id_=id_, accesskey=accesskey,
+        return self.create_with('ul',
+                                id_=id_, accesskey=accesskey,
+                                hidden=hidden, tabindex=tabindex,
+                                style=style, className=className,
+                                childList=childList)
+
+    def li(self, textContent, id_=None, accesskey=None, hidden=None,
+           tabindex=None, style=None, className=None, childList=None):
+        return self.create_with('li', textContent=textContent,
+                                id_=id_, accesskey=accesskey,
                                 hidden=hidden, tabindex=tabindex,
                                 style=style, className=className,
                                 childList=childList)
@@ -1388,7 +1367,7 @@ class Window(object):
         if isinstance(obj, Document):
             return {'head': obj.head, 'body': obj.body}
         if isinstance(obj, Element):
-            return Element.serializer(obj)
+            return Element._serializer(obj)
         if callable(obj):
             name = repr(obj)
             return name
@@ -1492,7 +1471,8 @@ class WsHandler(tornado.websocket.WebSocketHandler):
                 if callable(fnc):
                     doc._clean_diff()
                     fnc(dic)
-                    if 0 < len(doc._diffdat):
+                    #del#if 0 < len(doc._diffdat):
+                    if doc._dirty:
                         # self.write_message({'diff': doc._diffdat})
                         logger.debug('broadcast diff: {}'.format(len(doc._diffdat)))
                         self.broadcast({'diff': doc._diffdat})

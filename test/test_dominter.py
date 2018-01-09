@@ -593,7 +593,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(type(elm._style), domdom.Style)
         self.assertIsNone(elm._onclick)
         self.assertIsNone(elm._onchange)
-        self.assertEqual(elm._on, 0)
+        self.assertEqual(elm._sortorder, 0)
         #
         self.assertEqual(len(document._diffdat), ddcnt)
         ddd = document._diffdat[ddcnt-1]
@@ -2582,6 +2582,2610 @@ class TestDominter(unittest.TestCase):
         ddd = document._diffdat[ddcnt - 1]
         self.assertEqual(ddd['_objid_'], elm.id)
         self.assertEqual(ddd['_removeEventListener'], ['mousemove', repr(fnc1), ])
+
+    def test_Element_dumps(self):
+        win = Window()
+        document = win.document
+        elm = document.createElement('elmtag')
+        ddcnt = 1
+        s = elm._dumps()
+        d = json.loads(s)
+        self.assertEqual(d, {'tagName': 'elmtag', '_id': elm._id})
+        elm.test01 = '1234'
+        s = elm._dumps()
+        d = json.loads(s)
+        self.assertEqual(d, {'tagName': 'elmtag', '_id': elm._id, 'test01': '1234'})
+        elm.__dict__['test02'] = "246"
+        s = elm._dumps()
+        d = json.loads(s)
+        self.assertEqual(d, {'tagName': 'elmtag', '_id': elm._id, 'test01': '1234',
+                             'test02': '246'})
+
+    def test_Document(self):
+        win = Window()
+        document = win.document
+        # __init__
+        self.assertTrue(document._dirty)
+        self.assertEqual(document._obj_dic, {})
+        self.assertEqual(document._diffdat, [])
+        self.assertEqual(document._handlers, {})
+        self.assertEqual(type(document.head), domdom.Element)
+        self.assertEqual(document.head.document, document)
+        self.assertEqual(document.head.tagName, 'head')
+        self.assertEqual(type(document.body), domdom.Element)
+        self.assertEqual(document.body.document, document)
+        self.assertEqual(document.body.tagName, 'body')
+        self.assertIsNone(document._cache)
+
+        # _add_diff _clean_diff
+        document._dirty = False
+        document._add_diff('diffdat1')
+        self.assertTrue(document._dirty)
+        self.assertEqual(document._diffdat, ['diffdat1', ])
+        document._dirty = False
+        document._add_diff('diffdat2')
+        self.assertTrue(document._dirty)
+        self.assertEqual(document._diffdat, ['diffdat1', 'diffdat2', ])
+        document._clean_diff()
+        self.assertFalse(document._dirty)
+        self.assertEqual(document._diffdat, [])
+
+        # getElementById
+        elm1 = document.tag('input type="text" id="id001"')
+        elm2 = document.button('this is a button', id_='id002')
+        elm3 = document.createElement('button')
+        elm3.id = 'id003'
+        v = document.getElementById('id001')
+        self.assertEqual(v, elm1)
+        v = document.getElementById('id002')
+        self.assertEqual(v, elm2)
+        v = document.getElementById('id003')
+        self.assertEqual(v, elm3)
+        v = document.getElementById('id000')
+        self.assertEqual(v, None)
+
+        # getElementsByName
+        elm1.name = 'nameA'
+        elm2.name = 'nameB'
+        elm3.name = 'nameA'
+        lst = document.getElementsByName('nameA')
+        self.assertTrue(lst == [elm1, elm3] or lst == [elm3, elm1])
+        lst = document.getElementsByName('nameB')
+        self.assertEqual(lst, [elm2, ])
+
+        # getElementsByTagName
+        lst = document.getElementsByTagName('input')
+        self.assertEqual(lst, [elm1, ])
+        lst = document.getElementsByTagName('button')
+        self.assertTrue(lst == [elm2, elm3] or lst == [elm3, elm2])
+
+        # getElementsByClassName
+        elm1.className = 'clsA clsB'
+        elm2.className = 'clsB clsC'
+        elm3.className = 'clsC clsD'
+        lst = document.getElementsByClassName('clsA')
+        self.assertEqual(lst, [elm1, ])
+        lst = document.getElementsByClassName('clsB')
+        self.assertTrue(lst == [elm1, elm2] or lst == [elm2, elm1])
+        lst = document.getElementsByClassName('clsC')
+        self.assertTrue(lst == [elm2, elm3] or lst == [elm3, elm2])
+        lst = document.getElementsByClassName('clsD')
+        self.assertEqual(lst, [elm3, ])
+
+        # createElement
+        ddcnt = len(document._diffdat)
+        elm4 = document.createElement('tagname')
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        ddd = document._diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], elm4._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm4._id, 'tagName': 'tagname'})
+        self.assertTrue(elm4._id in document._obj_dic)
+        self.assertEqual(document._obj_dic[elm4._id], elm4)
+
+        # tag
+        del document._diffdat[:]
+        ddcnt = 0
+        with self.assertRaises(TypeError):
+            elm = document.tag()
+        with self.assertRaises(TypeError):
+            elm = document.tag(1234)
+        with self.assertRaises(TypeError):
+            elm = document.tag('')
+        # tag without option arg
+        elm = document.tag('tagwoopt')
+        self.assertEqual(elm.tagName, 'tagwoopt')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertFalse('textContent' in elm.__dict__)
+        self.assertIsNone(elm.onclick)
+        self.assertIsNone(elm.onchange)
+        self.assertEqual(elm._eventlisteners, [])
+        self.assertEqual(elm.childList, [])
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        ddd = document._diffdat[ddcnt - 1]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'tagwoopt'})
+        self.assertTrue(elm._id in document._obj_dic)
+        self.assertEqual(document._obj_dic[elm._id], elm)
+
+        # tag with option arg
+        del document._diffdat[:]
+        ddcnt = 0
+        def clickfnc(ev):
+            pass
+        def changefnc(ev):
+            pass
+        def fnc1(ev):
+            pass
+        def fnc2(ev):
+            pass
+        def fnc3(ev):
+            pass
+        elm = document.tag('tagwopt', textContent='ttttt',
+                           attrs={'atr1': 'aval1', 'atr2': 'aval2'},
+                           onclick=clickfnc, onchange=changefnc,
+                           handler=(('event1', fnc1), ('event2', fnc2), ('event3', fnc3)),
+                           childList=[elm1, elm2, elm3])
+        self.assertEqual(elm.tagName, 'tagwopt')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.textContent, 'ttttt')
+        self.assertEqual(elm.onclick, clickfnc)
+        self.assertEqual(elm.onchange, changefnc)
+        self.assertEqual(len(elm._eventlisteners), 3)
+        self.assertTrue(('event1', fnc1) in elm._eventlisteners)
+        self.assertTrue(('event2', fnc2) in elm._eventlisteners)
+        self.assertTrue(('event3', fnc3) in elm._eventlisteners)
+        self.assertEqual(elm.childList, [elm1, elm2, elm3])
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'tagwopt'})
+        self.assertTrue(elm._id in document._obj_dic)
+        self.assertEqual(document._obj_dic[elm._id], elm)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'ttttt'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setAttributes': {'atr1': 'aval1'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setAttributes': {'atr2': 'aval2'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onclick': repr(clickfnc)} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(changefnc)} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_addEventListener': ['event1', repr(fnc1)]} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_addEventListener': ['event2', repr(fnc2)]} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_addEventListener': ['event3', repr(fnc3)]} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # tag with tagtext
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.tag('tagtxt atr3="aval3" atr4="aval4" atr5'
+                           + ' id="ididid"'
+                           + ' class="cls1 cls2  cls3"'
+                           + ' style="background-color: green; font-size: 14;"'
+                           + ' _=vvv')
+        self.assertEqual(elm.tagName, 'tagtxt')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.atr3, 'aval3')
+        self.assertEqual(elm.atr4, 'aval4')
+        self.assertEqual(elm.atr5, True)
+        self.assertEqual(elm.id, 'ididid')
+        self.assertEqual(elm.className, 'cls1 cls2 cls3')
+        self.assertEqual(elm.style, {'background-color': 'green', 'font-size': '14'})
+        self.assertEqual(elm.style.backgroundColor, 'green')
+        self.assertEqual(elm.style.fontSize, '14')
+        self.assertEqual(elm.textContent, 'vvv')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        self.assertEqual(ddd['_objid_'], preid)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'tagtxt'})
+        self.assertTrue(elm._id in document._obj_dic)
+        self.assertEqual(document._obj_dic[elm.id], elm)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'atr3': 'aval3'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'atr4': 'aval4'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'ididid'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': 'ididid', 'className': 'cls1 cls2  cls3'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': 'ididid', '_setStyle': {'background-color': 'green'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': 'ididid', '_setStyle': {'font-size': '14'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': 'ididid', 'textContent': 'vvv'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # add_handler
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.tag('tagwopt', handler=('event2', fnc2))
+        self.assertEqual(elm.tagName, 'tagwopt')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(len(elm._eventlisteners), 1)
+        self.assertTrue(('event2', fnc2) in elm._eventlisteners)
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'tagwopt'})
+        self.assertTrue(elm._id in document._obj_dic)
+        self.assertEqual(document._obj_dic[elm._id], elm)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_addEventListener': ['event2', repr(fnc2)]} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # create_with without arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.create_with('cwtag')
+        self.assertEqual(elm.tagName, 'cwtag')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertFalse('type' in elm.__dict__)
+        self.assertFalse('value' in elm.__dict__)
+        self.assertFalse('src' in elm.__dict__)
+        self.assertFalse('textContent' in elm.__dict__)
+        self.assertFalse('checked' in elm.__dict__)
+        self.assertFalse('selectedIndex' in elm.__dict__)
+        self.assertEqual(elm.name, None)
+        self.assertFalse('min' in elm.__dict__)
+        self.assertFalse('max' in elm.__dict__)
+        self.assertFalse('step' in elm.__dict__)
+        self.assertFalse('multiple' in elm.__dict__)
+        self.assertFalse('size' in elm.__dict__)
+        self.assertFalse('label' in elm.__dict__)
+        self.assertFalse('selected' in elm.__dict__)
+        self.assertFalse('rows' in elm.__dict__)
+        self.assertFalse('cols' in elm.__dict__)
+        self.assertFalse('alt' in elm.__dict__)
+        self.assertFalse('width' in elm.__dict__)
+        self.assertFalse('height' in elm.__dict__)
+        self.assertFalse('href' in elm.__dict__)
+        self.assertFalse('rel' in elm.__dict__)
+        self.assertFalse('integrity' in elm.__dict__)
+        self.assertFalse('media' in elm.__dict__)
+        self.assertFalse('scoped' in elm.__dict__)
+        self.assertFalse('crossorigin' in elm.__dict__)
+        self.assertFalse('longdesc' in elm.__dict__)
+        self.assertFalse('sizes' in elm.__dict__)
+        self.assertFalse('referrerpolicy' in elm.__dict__)
+        self.assertFalse('srcset' in elm.__dict__)
+        self.assertFalse('download' in elm.__dict__)
+        self.assertFalse('target' in elm.__dict__)
+        self.assertFalse('readonly' in elm.__dict__)
+        self.assertFalse('disabled' in elm.__dict__)
+        self.assertFalse('placeholder' in elm.__dict__)
+        self.assertFalse('for_' in elm.__dict__)
+        self.assertFalse('id' in elm.__dict__)
+        self.assertFalse('accesskey' in elm.__dict__)
+        self.assertFalse('hidden' in elm.__dict__)
+        self.assertFalse('tabindex' in elm.__dict__)
+        self.assertEqual(elm.className, '')
+        self.assertEqual(elm.style, {})
+        self.assertEqual(elm.childList, [])
+        self.assertFalse('onclick' in elm.__dict__)
+        self.assertFalse('onchange' in elm.__dict__)
+        self.assertEqual(len(elm._eventlisteners), 0)
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'cwtag'})
+        self.assertTrue(elm._id in document._obj_dic)
+        self.assertEqual(document._obj_dic[elm._id], elm)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # create_with with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.create_with('cwtagid', id_='vid')
+        self.assertEqual(elm.tagName, 'cwtagid')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertFalse('type' in elm.__dict__)
+        self.assertFalse('value' in elm.__dict__)
+        self.assertFalse('src' in elm.__dict__)
+        self.assertFalse('textContent' in elm.__dict__)
+        self.assertFalse('checked' in elm.__dict__)
+        self.assertFalse('selectedIndex' in elm.__dict__)
+        self.assertEqual(elm.name, None)
+        self.assertFalse('min' in elm.__dict__)
+        self.assertFalse('max' in elm.__dict__)
+        self.assertFalse('step' in elm.__dict__)
+        self.assertFalse('multiple' in elm.__dict__)
+        self.assertFalse('size' in elm.__dict__)
+        self.assertFalse('label' in elm.__dict__)
+        self.assertFalse('selected' in elm.__dict__)
+        self.assertFalse('rows' in elm.__dict__)
+        self.assertFalse('cols' in elm.__dict__)
+        self.assertFalse('alt' in elm.__dict__)
+        self.assertFalse('width' in elm.__dict__)
+        self.assertFalse('height' in elm.__dict__)
+        self.assertFalse('href' in elm.__dict__)
+        self.assertFalse('rel' in elm.__dict__)
+        self.assertFalse('integrity' in elm.__dict__)
+        self.assertFalse('media' in elm.__dict__)
+        self.assertFalse('scoped' in elm.__dict__)
+        self.assertFalse('crossorigin' in elm.__dict__)
+        self.assertFalse('longdesc' in elm.__dict__)
+        self.assertFalse('sizes' in elm.__dict__)
+        self.assertFalse('referrerpolicy' in elm.__dict__)
+        self.assertFalse('srcset' in elm.__dict__)
+        self.assertFalse('download' in elm.__dict__)
+        self.assertFalse('target' in elm.__dict__)
+        self.assertFalse('readonly' in elm.__dict__)
+        self.assertFalse('disabled' in elm.__dict__)
+        self.assertFalse('placeholder' in elm.__dict__)
+        self.assertFalse('for_' in elm.__dict__)
+        self.assertEqual(elm.id, 'vid')
+        self.assertFalse('accesskey' in elm.__dict__)
+        self.assertFalse('hidden' in elm.__dict__)
+        self.assertFalse('tabindex' in elm.__dict__)
+        self.assertEqual(elm.className, '')
+        self.assertEqual(elm.style, {})
+        self.assertEqual(elm.childList, [])
+        self.assertFalse('onclick' in elm.__dict__)
+        self.assertFalse('onchange' in elm.__dict__)
+        self.assertEqual(len(elm._eventlisteners), 0)
+        ddcnt += 1
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['id'], 'vid')
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # create_with with arg wighout id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.create_with('cwtagwa', type_='vtype', value='vvalue',
+                                   src='vsrc', name='vname',
+                                   textContent='vtextContent',
+                                   checked='vchecked', selectedIndex=123,
+                                   min=-100, max=200, step=12, multiple='vmultiple',
+                                   size=98, label='vlabel', selected='vselected',
+                                   rows=77, cols=88,
+                                   alt='valt', width=99, height=111,
+                                   href='vhref', rel='vrel',
+                                   integrity='vintegrity', media='vmedia',
+                                   scoped='vscoped', crossorigin='vcrossorigin',
+                                   longdesc='vlongdesc', sizes='vsizes',
+                                   referrerpolicy='vreferrerpolicy',
+                                   srcset='vsrcset', download='vdownload',
+                                   target='vtarget',
+                                   readonly='vreadonly', disabled='vdisabled',
+                                   placeholder='vplaceholder', for_='vfor',
+                                   accesskey='vaccesskey',
+                                   hidden='vhidden', tabindex='vtabindex',
+                                   style='vstyle: vs', className='vclassName',
+                                   childList=[elm1, elm2],
+                                   onclick=fnc1, onchange=fnc2, handler=('mousemove', fnc3))
+        self.assertEqual(elm.tagName, 'cwtagwa')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.type, 'vtype')
+        self.assertEqual(elm.value, 'vvalue')
+        self.assertEqual(elm.src, 'vsrc')
+        self.assertEqual(elm.textContent, 'vtextContent')
+        self.assertEqual(elm.checked, 'vchecked')
+        self.assertEqual(elm.selectedIndex, 123)
+        self.assertEqual(elm.name, 'vname')
+        self.assertEqual(elm.min, -100)
+        self.assertEqual(elm.max, 200)
+        self.assertEqual(elm.step, 12)
+        self.assertEqual(elm.multiple, 'vmultiple')
+        self.assertEqual(elm.size, 98)
+        self.assertEqual(elm.label, 'vlabel')
+        self.assertEqual(elm.selected, 'vselected')
+        self.assertEqual(elm.rows, 77)
+        self.assertEqual(elm.cols, 88)
+        self.assertEqual(elm.alt, 'valt')
+        self.assertEqual(elm.width, 99)
+        self.assertEqual(elm.height, 111)
+        self.assertEqual(elm.href, 'vhref')
+        self.assertEqual(elm.rel, 'vrel')
+        self.assertEqual(elm.integrity, 'vintegrity')
+        self.assertEqual(elm.media, 'vmedia')
+        self.assertEqual(elm.scoped, 'vscoped')
+        self.assertEqual(elm.crossorigin, 'vcrossorigin')
+        self.assertEqual(elm.longdesc, 'vlongdesc')
+        self.assertEqual(elm.sizes, 'vsizes')
+        self.assertEqual(elm.referrerpolicy, 'vreferrerpolicy')
+        self.assertEqual(elm.srcset, 'vsrcset')
+        self.assertEqual(elm.download, 'vdownload')
+        self.assertEqual(elm.target, 'vtarget')
+        self.assertEqual(elm.readonly, 'vreadonly')
+        self.assertEqual(elm.disabled, 'vdisabled')
+        self.assertEqual(elm.placeholder, 'vplaceholder')
+        self.assertEqual(elm.for_, 'vfor')
+        self.assertEqual(elm.accesskey, 'vaccesskey')
+        self.assertEqual(elm.hidden, 'vhidden')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.className, 'vclassName')
+        self.assertEqual(elm.style.cssText, 'vstyle: vs;')
+        self.assertEqual(elm.childList, [elm1, elm2])
+        self.assertEqual(elm.onclick, fnc1)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm._eventlisteners, [('mousemove', fnc3),])
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'vtype'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'vvalue'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'src': 'vsrc'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'vtextContent'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'checked': 'vchecked'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'selectedIndex': 123} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'name': 'vname'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'min': -100} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'max': 200} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': 12} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'multiple': 'vmultiple'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'size': 98} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'label': 'vlabel'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'selected': 'vselected'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'rows': 77} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'cols': 88} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'alt': 'valt'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'width': 99} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'height': 111} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'href': 'vhref'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'rel': 'vrel'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'integrity': 'vintegrity'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'media': 'vmedia'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'scoped': 'vscoped'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'crossorigin': 'vcrossorigin'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'longdesc': 'vlongdesc'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'sizes': 'vsizes'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'referrerpolicy': 'vreferrerpolicy'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'srcset': 'vsrcset'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'download': 'vdownload'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'target': 'vtarget'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': 'vreadonly'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': 'vdisabled'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'placeholder': 'vplaceholder'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'for_': 'vfor'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'accesskey': 'vaccesskey'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'hidden': 'vhidden'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'vclassName'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'vstyle': 'vs'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm1._id} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm2._id} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onclick': repr(fnc1)} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_addEventListener': ['mousemove', repr(fnc3)]} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        def test_textcontent_id(fnc, name):
+            # fnc no arg
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('{}text'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.textContent, '{}text'.format(name))
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'textContent': '{}text'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+
+            # fnc with id
+            elm = fnc('{}text'.format(name), id_='id{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.textContent, '{}text'.format(name))
+            self.assertEqual(elm.id, 'id{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            preid = ddd['_objid_']
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': preid, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'textContent': '{}text'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'id': 'id{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+
+        def test_noarg_tag_id(fnc, name):
+            # fnc no arg
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc()
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+
+            # fnc with id
+            elm = fnc(id_='id{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.id, 'id{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            preid = ddd['_objid_']
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': preid, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'id': 'id{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+
+        def test_text_type_id(fnc, name, typ):
+            # no arg
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('t{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.type, typ)
+            self.assertEqual(elm.textContent, 't{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'type': typ} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'textContent': 't{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+
+            # with id
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('t{}'.format(name), id_='id{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.type, typ)
+            self.assertEqual(elm.textContent, 't{}'.format(name))
+            self.assertEqual(elm.id, 'id{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            preid = ddd['_objid_']
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': preid, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'type': typ} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'textContent': 't{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'id': 'id{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+
+        def test_value_type_id(fnc, name, typ):
+            # no arg
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('v{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.type, typ)
+            self.assertEqual(elm.value, 'v{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'type': typ} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'value': 'v{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+
+            # with id
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('v{}'.format(name), id_='id{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.type, typ)
+            self.assertEqual(elm.value, 'v{}'.format(name))
+            self.assertEqual(elm.id, 'id{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            preid = ddd['_objid_']
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': preid, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'type': typ} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'value': 'v{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'id': 'id{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+
+        def test_value_id(fnc, name):
+            # no arg
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('v{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.value, 'v{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'value': 'v{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+
+            # with id
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('v{}'.format(name), id_='id{}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.value, 'v{}'.format(name))
+            self.assertEqual(elm.id, 'id{}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            preid = ddd['_objid_']
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': preid, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'value': 'v{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': preid, 'id': 'id{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+
+        def test_title(fnc, name):
+            return test_textcontent_id(fnc, name)
+        ddcnt = test_title(document.title, 'title')
+
+        # style no arg
+        ddcnt = test_text_type_id(document.style, 'style', 'text/css')
+
+        # style with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        name = 'style'
+        typ = 'text/css'
+        elm = document.style('t{}'.format(name), media='wmedia', scoped='wscoped')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, name)
+        self.assertEqual(elm.type, typ)
+        self.assertEqual(elm.textContent, 't{}'.format(name))
+        self.assertEqual(elm.media, 'wmedia')
+        self.assertEqual(elm.scoped, 'wscoped')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': typ} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 't{}'.format(name)} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'media': 'wmedia'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'scoped': 'wscoped'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # link no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.link('wlink')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'link')
+        self.assertEqual(elm.href, 'wlink')
+        self.assertEqual(elm.rel, 'stylesheet')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'link'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'href': 'wlink'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'rel': 'stylesheet'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # link with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.link('wlink', id_='id0003')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'link')
+        self.assertEqual(elm.href, 'wlink')
+        self.assertEqual(elm.rel, 'stylesheet')
+        self.assertEqual(elm.id, 'id0003')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'link'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'href': 'wlink'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'rel': 'stylesheet'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'id0003'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # link with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.link('wlink', integrity='wintegrity', media='wmedia')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'link')
+        self.assertEqual(elm.href, 'wlink')
+        self.assertEqual(elm.rel, 'stylesheet')
+        self.assertEqual(elm.integrity, 'wintegrity')
+        self.assertEqual(elm.media, 'wmedia')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'link'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'href': 'wlink'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'rel': 'stylesheet'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'integrity': 'wintegrity'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'media': 'wmedia'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # script no arg
+        ddcnt = test_text_type_id(document.script, 'script', 'text/javascript')
+
+        # script with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.script('wscript', src='wsrc', crossorigin='wcrossorigin')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'script')
+        self.assertEqual(elm.type, 'text/javascript')
+        self.assertEqual(elm.textContent, 'wscript')
+        self.assertEqual(elm.src, 'wsrc')
+        self.assertEqual(elm.crossorigin, 'wcrossorigin')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'script'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'text/javascript'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'src': 'wsrc'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'wscript'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'crossorigin': 'wcrossorigin'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # br no arg
+        ddcnt = test_noarg_tag_id(document.br, 'br')
+
+        # p no arg
+        ddcnt = test_textcontent_id(document.p, 'p')
+
+        # p with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.p('wp', style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'p')
+        self.assertEqual(elm.textContent, 'wp')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'p'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'wp'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # span no arg
+        ddcnt = test_textcontent_id(document.span, 'span')
+
+        # span with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.span('wspan', style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'span')
+        self.assertEqual(elm.textContent, 'wspan')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'span'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'wspan'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # div no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.div('wdiv')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'div')
+        self.assertEqual(elm.textContent, 'wdiv')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'div'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'wdiv'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # div with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.div('wdiv', id_='id0009')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'div')
+        self.assertEqual(elm.textContent, 'wdiv')
+        self.assertEqual(elm.id, 'id0009')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'div'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'textContent': 'wdiv'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'id0009'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # div with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm1 = document.createElement('button')
+        elm2 = document.createElement('button')
+        elm3 = document.createElement('button')
+        ddcnt += 3
+        elm = document.div('wdiv', style='color: black', className='cls1 cls2', childList=[elm1, elm3])
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'div')
+        self.assertEqual(elm.textContent, 'wdiv')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'div'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'wdiv'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm1._id} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm3._id} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # button no arg
+        ddcnt = test_text_type_id(document.button, 'button', 'button')
+
+        # button with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.button('wbutton', name='nbutton', value='vbutton',
+                              disabled=True, onclick=fnc1,
+                              style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'button')
+        self.assertEqual(elm.type, 'button')
+        self.assertEqual(elm.textContent, 'wbutton')
+        self.assertEqual(elm.name, 'nbutton')
+        self.assertEqual(elm.value, 'vbutton')
+        self.assertEqual(elm.disabled, True)
+        self.assertEqual(elm.onclick, fnc1)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'button'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'button'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'vbutton'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'wbutton'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'name': 'nbutton'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onclick': repr(fnc1)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # text no arg
+        ddcnt = test_value_type_id(document.text, 'input', 'text')
+
+        # text with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.text('wtext', readonly=True, disabled=False,
+                            placeholder='ptext',
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'text')
+        self.assertEqual(elm.value, 'wtext')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.placeholder, 'ptext')
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'text'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wtext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'placeholder': 'ptext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # checkbox no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.checkbox()
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'checkbox')
+        self.assertEqual(elm.checked, False)
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'checkbox'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'checked': False} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # checkbox with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.checkbox(id_='id0012')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'checkbox')
+        self.assertEqual(elm.id, 'id0012')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'type': 'checkbox'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'checked': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'id0012'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # checkbox with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.checkbox(checked=True, value='vcheckbox',
+                                readonly=True, disabled=False,
+                                style='color: black', className='cls1 cls2',
+                                onchange=fnc3)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'checkbox')
+        self.assertEqual(elm.checked, True)
+        self.assertEqual(elm.value, 'vcheckbox')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc3)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'checkbox'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'vcheckbox'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'checked': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc3)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # radio no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.radio('nradio', 'vradio')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'radio')
+        self.assertEqual(elm.value, 'vradio')
+        self.assertEqual(elm.checked, False)
+        self.assertEqual(elm.name, 'nradio')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'radio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'vradio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'checked': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'name': 'nradio'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # radio with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.radio('nradio', 'vradio', id_='id0013')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'radio')
+        self.assertEqual(elm.value, 'vradio')
+        self.assertEqual(elm.checked, False)
+        self.assertEqual(elm.name, 'nradio')
+        self.assertEqual(elm.id, 'id0013')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'type': 'radio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'value': 'vradio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'checked': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'name': 'nradio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'id0013'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # radio with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.radio('nradio', 'vradio', checked=True,
+                                readonly=True, disabled=False,
+                                style='color: black', className='cls1 cls2',
+                                onchange=fnc3)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'radio')
+        self.assertEqual(elm.value, 'vradio')
+        self.assertEqual(elm.checked, True)
+        self.assertEqual(elm.name, 'nradio')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc3)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'radio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'vradio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'checked': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'name': 'nradio'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc3)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # color no arg
+        ddcnt = test_value_type_id(document.color, 'input', 'color')
+
+        # color with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.color('wcolor', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'color')
+        self.assertEqual(elm.value, 'wcolor')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'color'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wcolor'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # date no arg
+        ddcnt = test_value_type_id(document.date, 'input', 'date')
+
+        # date with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.date('wdate', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'date')
+        self.assertEqual(elm.value, 'wdate')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'date'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wdate'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # datetime_local no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.datetime_local('wdatetime_local')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'datetime-local')
+        self.assertEqual(elm.step, '1')
+        self.assertEqual(elm.value, 'wdatetime_local')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'datetime-local'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wdatetime_local'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # datetime_local with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.datetime_local('wdatetime_local', id_='id0016')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'datetime-local')
+        self.assertEqual(elm.step, '1')
+        self.assertEqual(elm.value, 'wdatetime_local')
+        self.assertEqual(elm.id, 'id0016')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'type': 'datetime-local'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'value': 'wdatetime_local'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'id0016'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # datetime_local with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.datetime_local('wdatetime_local', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'datetime-local')
+        self.assertEqual(elm.step, '1')
+        self.assertEqual(elm.value, 'wdatetime_local')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'datetime-local'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wdatetime_local'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # month no arg
+        ddcnt = test_value_type_id(document.month, 'input', 'month')
+
+        # month with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.month('wmonth', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'month')
+        self.assertEqual(elm.value, 'wmonth')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'month'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wmonth'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # time no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.time('wtime')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'time')
+        self.assertEqual(elm.step, '1')
+        self.assertEqual(elm.value, 'wtime')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'time'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wtime'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # time with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.time('wtime', id_='idtime')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'time')
+        self.assertEqual(elm.step, '1')
+        self.assertEqual(elm.value, 'wtime')
+        self.assertEqual(elm.id, 'idtime')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'type': 'time'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'value': 'wtime'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'idtime'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # time with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.time('wtime', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'time')
+        self.assertEqual(elm.step, '1')
+        self.assertEqual(elm.value, 'wtime')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'time'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wtime'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # week no arg
+        ddcnt = test_value_type_id(document.week, 'input', 'week')
+
+        # week with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.week('wweek', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'week')
+        self.assertEqual(elm.value, 'wweek')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'week'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wweek'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # file no arg
+        ddcnt = test_value_type_id(document.file, 'input', 'file')
+
+        # file with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.file('wfile', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'file')
+        self.assertEqual(elm.value, 'wfile')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'file'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wfile'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # number no arg
+        ddcnt = test_value_type_id(document.number, 'input', 'number')
+
+        # number with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.number('wnumber', min=-555, max=444, step=12,
+                              readonly=True, disabled=False,
+                              style='color: black', className='cls1 cls2',
+                              onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'number')
+        self.assertEqual(elm.min, -555)
+        self.assertEqual(elm.max, 444)
+        self.assertEqual(elm.step, 12)
+        self.assertEqual(elm.value, 'wnumber')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'number'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wnumber'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'min': -555} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'max': 444} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': 12} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # password no arg
+        ddcnt = test_value_type_id(document.password, 'input', 'password')
+
+        # password with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.password('wpassword', readonly=True, disabled=False,
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'password')
+        self.assertEqual(elm.value, 'wpassword')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'password'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wpassword'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # range no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.range('wrange')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'range')
+        self.assertEqual(elm.value, 'wrange')
+        self.assertEqual(elm.min, '0')
+        self.assertEqual(elm.max, '100')
+        self.assertEqual(elm.step, '1')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'range'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wrange'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'min': '0'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'max': '100'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # range with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.range('wrange', id_='idrange')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'range')
+        self.assertEqual(elm.value, 'wrange')
+        self.assertEqual(elm.min, '0')
+        self.assertEqual(elm.max, '100')
+        self.assertEqual(elm.step, '1')
+        self.assertEqual(elm.id, 'idrange')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'type': 'range'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'value': 'wrange'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'min': '0'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'max': '100'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'step': '1'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'idrange'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # range with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.range('wrange', min=-555, max=444, step=12,
+                              readonly=True, disabled=False,
+                              style='color: black', className='cls1 cls2',
+                              onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'input')
+        self.assertEqual(elm.type, 'range')
+        self.assertEqual(elm.min, -555)
+        self.assertEqual(elm.max, 444)
+        self.assertEqual(elm.step, 12)
+        self.assertEqual(elm.value, 'wrange')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'input'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'type': 'range'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wrange'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'min': -555} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'max': 444} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'step': 12} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # select no arg
+        ddcnt = test_value_id(document.select, 'select')
+
+        # select with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.select('wselect', selectedIndex=19, name='nselect',
+                              multiple='mselect', size=91,
+                              readonly=True, disabled=False,
+                              style='color: black', className='cls1 cls2',
+                              onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'select')
+        self.assertEqual(elm.selectedIndex, 19)
+        self.assertEqual(elm.name, 'nselect')
+        self.assertEqual(elm.multiple, 'mselect')
+        self.assertEqual(elm.size, 91)
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'select'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'wselect'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'selectedIndex': 19} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'name': 'nselect'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'multiple': 'mselect'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'size': 91} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # option no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.option('voption', 'coption')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'option')
+        self.assertEqual(elm.value, 'voption')
+        self.assertEqual(elm.textContent, 'coption')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'option'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'voption'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'coption'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # option with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.option('voption', 'coption', id_='idoption')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'option')
+        self.assertEqual(elm.value, 'voption')
+        self.assertEqual(elm.textContent, 'coption')
+        self.assertEqual(elm.id, 'idoption')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'option'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'value': 'voption'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'textContent': 'coption'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'idoption'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # option with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.option('voption', 'coption',
+                              label='loption', selected=True,
+                              readonly=True, disabled=False,
+                              style='color: black', className='cls1 cls2',
+                              onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'option')
+        self.assertEqual(elm.value, 'voption')
+        self.assertEqual(elm.textContent, 'coption')
+        self.assertEqual(elm.label, 'loption')
+        self.assertEqual(elm.selected, True)
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'option'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'voption'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'coption'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'label': 'loption'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'selected': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # textarea no arg
+        ddcnt = test_value_id(document.textarea, 'textarea')
+
+        # textarea with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.textarea('vtextarea',
+                               rows=89, cols=76,
+                               readonly=True, disabled=False,
+                               style='color: black', className='cls1 cls2',
+                               onchange=fnc2)
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'textarea')
+        self.assertEqual(elm.value, 'vtextarea')
+        self.assertEqual(elm.rows, 89)
+        self.assertEqual(elm.cols, 76)
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'textarea'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'value': 'vtextarea'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'rows': 89} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'cols': 76} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'onchange': repr(fnc2)} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # table no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.table()
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'table')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'table'})
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # table with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.table(id_='idtable')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'table')
+        self.assertEqual(elm.id, 'idtable')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'table'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'idtable'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # table with arg
+        elm1 = document.createElement('button')
+        elm2 = document.createElement('button')
+        elm3 = document.createElement('button')
+        ddcnt += 3
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.table(readonly=True, disabled=False,
+                             style='color: black', className='cls1 cls2',
+                             childList=[elm1, elm2])
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'table')
+        self.assertEqual(elm.readonly, True)
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        self.assertEqual(elm.childList, [elm1, elm2])
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'table'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm1._id} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm2._id} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # tr no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.tr()
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'tr')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'tr'})
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # tr with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.tr(id_='idtr')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'tr')
+        self.assertEqual(elm.id, 'idtr')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'tr'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'idtr'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # tr with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm1 = document.createElement('button')
+        elm2 = document.createElement('button')
+        elm3 = document.createElement('button')
+        ddcnt += 3
+        elm = document.tr(style='color: black', className='cls1 cls2',
+                          childList=[elm3, elm2])
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'tr')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        self.assertEqual(elm.childList, [elm3, elm2])
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'tr'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm3._id} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm2._id} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # th no arg
+        ddcnt = test_textcontent_id(document.th, 'th')
+
+        # th with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.th('thtext', style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'th')
+        self.assertEqual(elm.textContent, 'thtext')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'th'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'thtext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # td no arg
+        ddcnt = test_textcontent_id(document.td, 'td')
+
+        # td with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.td('tdtext', style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'td')
+        self.assertEqual(elm.textContent, 'tdtext')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'td'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'tdtext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # fieldset no arg
+        ddcnt = test_textcontent_id(document.fieldset, 'fieldset')
+
+        # fieldset with arg
+        elm1 = document.createElement('button')
+        elm2 = document.createElement('button')
+        elm3 = document.createElement('button')
+        ddcnt += 3
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.fieldset(textContent='cfieldset', disabled=False,
+                             style='color: black', className='cls1 cls2',
+                             childList=[elm1, elm2])
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'fieldset')
+        self.assertEqual(elm.textContent, 'cfieldset')
+        self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        self.assertEqual(elm.childList, [elm1, elm2])
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'fieldset'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'cfieldset'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm1._id} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_appendChild': elm2._id} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # legend no arg
+        ddcnt = test_textcontent_id(document.legend, 'legend')
+
+        # legend with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.legend('legendtext', style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'legend')
+        self.assertEqual(elm.textContent, 'legendtext')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'legend'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'legendtext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # img no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.img('simg')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'img')
+        self.assertEqual(elm.src, 'simg')
+        self.assertEqual(elm.alt, '')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'img'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'src': 'simg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'alt': ''} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # img with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.img('simg', id_='idimg')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'img')
+        self.assertEqual(elm.src, 'simg')
+        self.assertEqual(elm.alt, '')
+        self.assertEqual(elm.id, 'idimg')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'img'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'src': 'simg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'alt': ''} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'idimg'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # img with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.img('simg', alt='aimg', width=123, height=45,
+                           crossorigin='cimg', longdesc='limg', sizes='szimg',
+                           referrerpolicy='rpimg', srcset='ssimg',
+                           style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'img')
+        self.assertEqual(elm.src, 'simg')
+        self.assertEqual(elm.alt, 'aimg')
+        self.assertEqual(elm.width, 123)
+        self.assertEqual(elm.height, 45)
+        self.assertEqual(elm.crossorigin, 'cimg')
+        self.assertEqual(elm.longdesc, 'limg')
+        self.assertEqual(elm.sizes, 'szimg')
+        self.assertEqual(elm.referrerpolicy, 'rpimg')
+        self.assertEqual(elm.srcset, 'ssimg')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'img'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'src': 'simg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'alt': 'aimg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'width': 123} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'height': 45} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'crossorigin': 'cimg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'longdesc': 'limg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'sizes': 'szimg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'referrerpolicy': 'rpimg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'srcset': 'ssimg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # a no arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.a('wa', 'ca')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'a')
+        self.assertEqual(elm.href, 'wa')
+        self.assertEqual(elm.textContent, 'ca')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'a'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'ca'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'href': 'wa'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # a with id
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.a('wa', 'ca', id_='ida')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'a')
+        self.assertEqual(elm.textContent, 'ca')
+        self.assertEqual(elm.href, 'wa')
+        self.assertEqual(elm.id, 'ida')
+        ddd = document._diffdat[ddcnt]
+        preid = ddd['_objid_']
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': preid, 'tagName': 'a'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'textContent': 'ca'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'href': 'wa'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': preid, 'id': 'ida'} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # a with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.a('wa', 'ca', download='da', rel='ra',
+                         target='ta', referrerpolicy='rpa',
+                         style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'a')
+        self.assertEqual(elm.textContent, 'ca')
+        self.assertEqual(elm.href, 'wa')
+        self.assertEqual(elm.rel, 'ra')
+        self.assertEqual(elm.target, 'ta')
+        self.assertEqual(elm.referrerpolicy, 'rpa')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'a'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'ca'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'href': 'wa'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'rel': 'ra'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'referrerpolicy': 'rpa'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'download': 'da'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'target': 'ta'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        # label no arg
+        ddcnt = test_textcontent_id(document.label, 'label')
+
+        # label with arg
+        del document._diffdat[:]
+        ddcnt = 0
+        elm = document.label('labeltext', for_='flabel',
+                             style='color: black', className='cls1 cls2')
+        self.assertEqual(type(elm), domdom.Element)
+        self.assertEqual(elm.tagName, 'label')
+        self.assertEqual(elm.textContent, 'labeltext')
+        self.assertEqual(elm.for_, 'flabel')
+        self.assertEqual(elm.style, {'color': 'black'})
+        self.assertEqual(elm.className, 'cls1 cls2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_objid_'], elm._id)
+        s = ddd['_createElement']
+        j = json.loads(s)
+        self.assertEqual(j, {'_id': elm._id, 'tagName': 'label'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'textContent': 'labeltext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'for_': 'flabel'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+
+        def test_h1(fnc, name):
+            test_textcontent_id(fnc, name)
+
+            # h1 with arg
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('{}text'.format(name), accesskey='a{}'.format(name),
+                      hidden='h{}'.format(name),
+                      tabindex='t{}'.format(name),
+                      style='{}: black'.format(name),
+                      className='cls1 cls2 {}'.format(name))
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.textContent, '{}text'.format(name))
+            self.assertEqual(elm.accesskey, 'a{}'.format(name))
+            self.assertEqual(elm.tabindex, 't{}'.format(name))
+            self.assertEqual(elm.style, {name: 'black'})
+            self.assertEqual(elm.className, 'cls1 cls2 {}'.format(name))
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'textContent': '{}text'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'accesskey': 'a{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'hidden': 'h{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'tabindex': 't{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2 {}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, '_setStyle': {name: 'black'}} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+
+        test_h1(document.h1, 'h1')
+        test_h1(document.h2, 'h2')
+        test_h1(document.h3, 'h3')
+        test_h1(document.h4, 'h4')
+        test_h1(document.h5, 'h5')
+        test_h1(document.h6, 'h6')
+
+        def test_ol(fnc, name):
+            test_noarg_tag_id(fnc, name)
+            # ol with arg
+            elm1 = document.createElement('button')
+            elm2 = document.createElement('button')
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc(accesskey='a{}'.format(name),
+                      hidden='h{}'.format(name),
+                      tabindex='t{}'.format(name),
+                      style='{}: black'.format(name),
+                      className='cls1 cls2 {}'.format(name),
+                      childList=[elm1, elm2])
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.accesskey, 'a{}'.format(name))
+            self.assertEqual(elm.tabindex, 't{}'.format(name))
+            self.assertEqual(elm.style, {name: 'black'})
+            self.assertEqual(elm.className, 'cls1 cls2 {}'.format(name))
+            self.assertEqual(elm.childList, [elm1, elm2])
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'accesskey': 'a{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'hidden': 'h{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'tabindex': 't{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2 {}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, '_setStyle': {name: 'black'}} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, '_appendChild': elm1.id} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, '_appendChild': elm2.id} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+        test_ol(document.ol, 'ol')
+        test_ol(document.ul, 'ul')
+
+        def test_li(fnc, name):
+            test_textcontent_id(fnc, name)
+            # ol with arg
+            elm1 = document.createElement('button')
+            elm2 = document.createElement('button')
+            del document._diffdat[:]
+            ddcnt = 0
+            elm = fnc('{}text'.format(name), accesskey='a{}'.format(name),
+                      hidden='h{}'.format(name),
+                      tabindex='t{}'.format(name),
+                      style='{}: black'.format(name),
+                      className='cls1 cls2 {}'.format(name),
+                      childList=[elm1, elm2])
+            self.assertEqual(type(elm), domdom.Element)
+            self.assertEqual(elm.tagName, name)
+            self.assertEqual(elm.textContent, '{}text'.format(name))
+            self.assertEqual(elm.accesskey, 'a{}'.format(name))
+            self.assertEqual(elm.tabindex, 't{}'.format(name))
+            self.assertEqual(elm.style, {name: 'black'})
+            self.assertEqual(elm.className, 'cls1 cls2 {}'.format(name))
+            self.assertEqual(elm.childList, [elm1, elm2])
+            ddd = document._diffdat[ddcnt]
+            self.assertEqual(ddd['_objid_'], elm._id)
+            s = ddd['_createElement']
+            j = json.loads(s)
+            self.assertEqual(j, {'_id': elm._id, 'tagName': name})
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'textContent': '{}text'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'accesskey': 'a{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'hidden': 'h{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'tabindex': 't{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2 {}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, '_setStyle': {name: 'black'}} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, '_appendChild': elm1.id} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, '_appendChild': elm2.id} in document._diffdat)
+            ddcnt += 1
+            self.assertEqual(len(document._diffdat), ddcnt)
+            return ddcnt
+        test_li(document.li, 'li')
+        test_ol(document.section, 'section')
+        test_ol(document.header, 'header')
+        test_ol(document.footer, 'footer')
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
     '_id', '_objid_', '_classList', '_eventlisteners',
     '_childList', '_onclick', 'onclick', '_onchange', 'onchange',
     '_setAttributes', '_removeAttributes', '_delattr',
-    '_clearChild', '_reverseChild', '_on',
+    '_clearChild', '_reverseChild', '_sortorder',
     '_addClass', '_removeClass', '_clearClass',
     '_setStyle', '_deleteStyle', '_clearStyle',
     '_removeChild', '_appendChild', '_insertBefore', '_replaceChild',
