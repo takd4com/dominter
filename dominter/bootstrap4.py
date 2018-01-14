@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
 # constants for bootstrap4 css
+# Copyright (c) 2017-2018 Tamini Bean
+# License: MIT
 
 CSS_URL = 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css'
 CSS_LINK_TEXT = 'link rel="stylesheet" href="{}"'.format(CSS_URL)

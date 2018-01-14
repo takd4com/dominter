@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
 # constants for pure css
+# Copyright (c) 2017-2018 Tamini Bean
+# License: MIT
 
 CSS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css"
 CSS_LINK_TEXT = 'link rel="stylesheet" href="{}"'.format(CSS_URL)

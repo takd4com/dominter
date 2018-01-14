@@ -5,7 +5,7 @@ import io
 
 setup(
     name='dominter',
-    version='0.0.3',
+    version='0.1.0',
     description='A simple GUI package for small asynchronous web application',
     long_description=io.open('README.rst', encoding='utf-8').read(),
     author='Tamini Bean',
@@ -18,7 +18,7 @@ setup(
     url='https://github.com/takd4com/dominter',
     keywords='dom browser gui asynchronous web',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',

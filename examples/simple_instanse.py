@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# dominter
 from dominter.dom import Window, start_app
 
 

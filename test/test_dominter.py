@@ -570,9 +570,23 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(s3.topXxx, '123')
         self.assertEqual(s3.topXxx, s3['top-xxx'])
         self.assertTrue(hasattr(s3, 'topXxx'))
-        s3.removeProperty('topXxx')
-        self.assertEqual(len(s3), 0)
+        s3.setProperty('color', 'blue')
+        self.assertEqual(len(s3), 2)
+        self.assertEqual(s3.color, 'blue')
+        self.assertEqual(s3.color, s3['color'])
+        self.assertTrue(hasattr(s3, 'color'))
+        val = s3.removeProperty('topXxx')
+        self.assertEqual(len(s3), 1)
         self.assertFalse(hasattr(s3, 'topXxx'))
+        self.assertEqual(val, '123')
+        val = s3.removeProperty('topXxx')
+        self.assertEqual(len(s3), 1)
+        self.assertFalse(hasattr(s3, 'topXxx'))
+        self.assertEqual(val, None)
+        val = s3.removeProperty('color')
+        self.assertEqual(len(s3), 0)
+        self.assertFalse(hasattr(s3, 'color'))
+        self.assertEqual(val, 'blue')
 
     def test_Element1(self):
         win = Window()
@@ -2605,7 +2619,8 @@ class TestDominter(unittest.TestCase):
         win = Window()
         document = win.document
         # __init__
-        self.assertTrue(document._dirty)
+        self.assertTrue(document._dirty_cache)
+        self.assertFalse(document._dirty_diff)
         self.assertEqual(document._obj_dic, {})
         self.assertEqual(document._diffdat, [])
         self.assertEqual(document._handlers, {})
@@ -2618,16 +2633,16 @@ class TestDominter(unittest.TestCase):
         self.assertIsNone(document._cache)
 
         # _add_diff _clean_diff
-        document._dirty = False
+        document._dirty_diff = False
         document._add_diff('diffdat1')
-        self.assertTrue(document._dirty)
+        self.assertTrue(document._dirty_diff)
         self.assertEqual(document._diffdat, ['diffdat1', ])
         document._dirty = False
         document._add_diff('diffdat2')
-        self.assertTrue(document._dirty)
+        self.assertTrue(document._dirty_diff)
         self.assertEqual(document._diffdat, ['diffdat1', 'diffdat2', ])
         document._clean_diff()
-        self.assertFalse(document._dirty)
+        self.assertFalse(document._dirty_diff)
         self.assertEqual(document._diffdat, [])
 
         # getElementById
@@ -2847,6 +2862,9 @@ class TestDominter(unittest.TestCase):
         self.assertFalse('min' in elm.__dict__)
         self.assertFalse('max' in elm.__dict__)
         self.assertFalse('step' in elm.__dict__)
+        self.assertFalse('minlength' in elm.__dict__)
+        self.assertFalse('maxlength' in elm.__dict__)
+        self.assertFalse('pattern' in elm.__dict__)
         self.assertFalse('multiple' in elm.__dict__)
         self.assertFalse('size' in elm.__dict__)
         self.assertFalse('label' in elm.__dict__)
@@ -2876,6 +2894,7 @@ class TestDominter(unittest.TestCase):
         self.assertFalse('accesskey' in elm.__dict__)
         self.assertFalse('hidden' in elm.__dict__)
         self.assertFalse('tabindex' in elm.__dict__)
+        self.assertFalse('title' in elm.__dict__)
         self.assertEqual(elm.className, '')
         self.assertEqual(elm.style, {})
         self.assertEqual(elm.childList, [])
@@ -2908,6 +2927,9 @@ class TestDominter(unittest.TestCase):
         self.assertFalse('min' in elm.__dict__)
         self.assertFalse('max' in elm.__dict__)
         self.assertFalse('step' in elm.__dict__)
+        self.assertFalse('minlength' in elm.__dict__)
+        self.assertFalse('maxlength' in elm.__dict__)
+        self.assertFalse('pattern' in elm.__dict__)
         self.assertFalse('multiple' in elm.__dict__)
         self.assertFalse('size' in elm.__dict__)
         self.assertFalse('label' in elm.__dict__)
@@ -2937,6 +2959,7 @@ class TestDominter(unittest.TestCase):
         self.assertFalse('accesskey' in elm.__dict__)
         self.assertFalse('hidden' in elm.__dict__)
         self.assertFalse('tabindex' in elm.__dict__)
+        self.assertFalse('title' in elm.__dict__)
         self.assertEqual(elm.className, '')
         self.assertEqual(elm.style, {})
         self.assertEqual(elm.childList, [])
@@ -2956,7 +2979,9 @@ class TestDominter(unittest.TestCase):
                                    src='vsrc', name='vname',
                                    textContent='vtextContent',
                                    checked='vchecked', selectedIndex=123,
-                                   min=-100, max=200, step=12, multiple='vmultiple',
+                                   min=-100, max=200, step=12,
+                                   minlength=6, maxlength=11, pattern='vpattern',
+                                   multiple='vmultiple',
                                    size=98, label='vlabel', selected='vselected',
                                    rows=77, cols=88,
                                    alt='valt', width=99, height=111,
@@ -2971,6 +2996,7 @@ class TestDominter(unittest.TestCase):
                                    placeholder='vplaceholder', for_='vfor',
                                    accesskey='vaccesskey',
                                    hidden='vhidden', tabindex='vtabindex',
+                                   title='vtitle',
                                    style='vstyle: vs', className='vclassName',
                                    childList=[elm1, elm2],
                                    onclick=fnc1, onchange=fnc2, handler=('mousemove', fnc3))
@@ -2986,6 +3012,9 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.min, -100)
         self.assertEqual(elm.max, 200)
         self.assertEqual(elm.step, 12)
+        self.assertEqual(elm.minlength, 6)
+        self.assertEqual(elm.maxlength, 11)
+        self.assertEqual(elm.pattern, 'vpattern')
         self.assertEqual(elm.multiple, 'vmultiple')
         self.assertEqual(elm.size, 98)
         self.assertEqual(elm.label, 'vlabel')
@@ -3014,6 +3043,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.accesskey, 'vaccesskey')
         self.assertEqual(elm.hidden, 'vhidden')
         self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.className, 'vclassName')
         self.assertEqual(elm.style.cssText, 'vstyle: vs;')
         self.assertEqual(elm.childList, [elm1, elm2])
@@ -3040,6 +3070,12 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'max': 200} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'step': 12} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'minlength': 6} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'maxlength': 11} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'pattern': 'vpattern'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'multiple': 'vmultiple'} in document._diffdat)
         ddcnt += 1
@@ -3096,6 +3132,8 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'hidden': 'vhidden'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'vclassName'} in document._diffdat)
         ddcnt += 1
@@ -3452,10 +3490,13 @@ class TestDominter(unittest.TestCase):
         # p with arg
         del document._diffdat[:]
         ddcnt = 0
-        elm = document.p('wp', style='color: black', className='cls1 cls2')
+        elm = document.p('wp', tabindex='vtabindex', title='vtitle',
+                         style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'p')
         self.assertEqual(elm.textContent, 'wp')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3465,6 +3506,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(j, {'_id': elm._id, 'tagName': 'p'})
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'textContent': 'wp'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -3478,10 +3523,13 @@ class TestDominter(unittest.TestCase):
         # span with arg
         del document._diffdat[:]
         ddcnt = 0
-        elm = document.span('wspan', style='color: black', className='cls1 cls2')
+        elm = document.span('wspan', tabindex='vtabindex', title='vtitle',
+                            style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'span')
         self.assertEqual(elm.textContent, 'wspan')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3491,6 +3539,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(j, {'_id': elm._id, 'tagName': 'span'})
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'textContent': 'wspan'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -3542,10 +3594,14 @@ class TestDominter(unittest.TestCase):
         elm2 = document.createElement('button')
         elm3 = document.createElement('button')
         ddcnt += 3
-        elm = document.div('wdiv', style='color: black', className='cls1 cls2', childList=[elm1, elm3])
+        elm = document.div('wdiv', tabindex='vtabindex', title='vtitle',
+                           style='color: black', className='cls1 cls2',
+                           childList=[elm1, elm3])
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'div')
         self.assertEqual(elm.textContent, 'wdiv')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3555,6 +3611,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(j, {'_id': elm._id, 'tagName': 'div'})
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'textContent': 'wdiv'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -3566,7 +3626,7 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # button no arg
+        # button no arg & with id
         ddcnt = test_text_type_id(document.button, 'button', 'button')
 
         # button with arg
@@ -3574,6 +3634,7 @@ class TestDominter(unittest.TestCase):
         ddcnt = 0
         elm = document.button('wbutton', name='nbutton', value='vbutton',
                               disabled=True, onclick=fnc1,
+                              tabindex='vtabindex', title='vtitle',
                               style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'button')
@@ -3583,6 +3644,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.value, 'vbutton')
         self.assertEqual(elm.disabled, True)
         self.assertEqual(elm.onclick, fnc1)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3601,6 +3664,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': True} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -3616,7 +3683,9 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.text('wtext', readonly=True, disabled=False,
-                            placeholder='ptext',
+                            placeholder='ptext', pattern='vpattern',
+                            minlength='vminlength', maxlength='vmaxlength',
+                            size='vsize', tabindex='vtabindex', title='vtitle',
                             style='color: black', className='cls1 cls2',
                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -3626,7 +3695,13 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.placeholder, 'ptext')
+        self.assertEqual(elm.pattern, 'vpattern')
+        self.assertEqual(elm.minlength, 'vminlength')
+        self.assertEqual(elm.maxlength, 'vmaxlength')
+        self.assertEqual(elm.size, 'vsize')
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3644,6 +3719,18 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'placeholder': 'ptext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'pattern': 'vpattern'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'minlength': 'vminlength'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'maxlength': 'vmaxlength'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'size': 'vsize'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -3700,6 +3787,7 @@ class TestDominter(unittest.TestCase):
         ddcnt = 0
         elm = document.checkbox(checked=True, value='vcheckbox',
                                 readonly=True, disabled=False,
+                                tabindex='vtabindex', title='vtitle',
                                 style='color: black', className='cls1 cls2',
                                 onchange=fnc3)
         self.assertEqual(type(elm), domdom.Element)
@@ -3710,6 +3798,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc3)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3727,6 +3817,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -3795,9 +3889,10 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.radio('nradio', 'vradio', checked=True,
-                                readonly=True, disabled=False,
-                                style='color: black', className='cls1 cls2',
-                                onchange=fnc3)
+                            readonly=True, disabled=False,
+                             tabindex='vtabindex', title='vtitle',
+                            style='color: black', className='cls1 cls2',
+                            onchange=fnc3)
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'input')
         self.assertEqual(elm.type, 'radio')
@@ -3807,6 +3902,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc3)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3827,6 +3924,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -3842,8 +3943,9 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.color('wcolor', readonly=True, disabled=False,
-                            style='color: black', className='cls1 cls2',
-                            onchange=fnc2)
+                             tabindex='vtabindex', title='vtitle',
+                             style='color: black', className='cls1 cls2',
+                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'input')
         self.assertEqual(elm.type, 'color')
@@ -3851,6 +3953,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3867,6 +3971,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -3882,6 +3990,7 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.date('wdate', readonly=True, disabled=False,
+                            tabindex='vtabindex', title='vtitle',
                             style='color: black', className='cls1 cls2',
                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -3891,6 +4000,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3906,6 +4017,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -3968,8 +4083,9 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.datetime_local('wdatetime_local', readonly=True, disabled=False,
-                            style='color: black', className='cls1 cls2',
-                            onchange=fnc2)
+                                      tabindex='vtabindex', title='vtitle',
+                                      style='color: black', className='cls1 cls2',
+                                      onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'input')
         self.assertEqual(elm.type, 'datetime-local')
@@ -3978,6 +4094,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -3996,6 +4114,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -4011,6 +4133,7 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.month('wmonth', readonly=True, disabled=False,
+                            tabindex='vtabindex', title='vtitle',
                             style='color: black', className='cls1 cls2',
                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -4020,6 +4143,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4035,6 +4160,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4097,6 +4226,7 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.time('wtime', readonly=True, disabled=False,
+                            tabindex='vtabindex', title='vtitle',
                             style='color: black', className='cls1 cls2',
                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -4107,6 +4237,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4125,6 +4257,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -4133,13 +4269,14 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # week no arg
+        # week no arg & with id
         ddcnt = test_value_type_id(document.week, 'input', 'week')
 
         # week with arg
         del document._diffdat[:]
         ddcnt = 0
         elm = document.week('wweek', readonly=True, disabled=False,
+                            tabindex='vtabindex', title='vtitle',
                             style='color: black', className='cls1 cls2',
                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -4149,6 +4286,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4165,6 +4304,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -4173,13 +4316,14 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # file no arg
+        # file no arg & with id
         ddcnt = test_value_type_id(document.file, 'input', 'file')
 
         # file with arg
         del document._diffdat[:]
         ddcnt = 0
         elm = document.file('wfile', readonly=True, disabled=False,
+                            tabindex='vtabindex', title='vtitle',
                             style='color: black', className='cls1 cls2',
                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -4189,6 +4333,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4205,6 +4351,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -4213,7 +4363,7 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # number no arg
+        # number no arg & with id
         ddcnt = test_value_type_id(document.number, 'input', 'number')
 
         # number with arg
@@ -4221,6 +4371,7 @@ class TestDominter(unittest.TestCase):
         ddcnt = 0
         elm = document.number('wnumber', min=-555, max=444, step=12,
                               readonly=True, disabled=False,
+                              tabindex='vtabindex', title='vtitle',
                               style='color: black', className='cls1 cls2',
                               onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -4233,6 +4384,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4255,6 +4408,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -4263,15 +4420,16 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # password no arg
+        # password no arg & with id
         ddcnt = test_value_type_id(document.password, 'input', 'password')
 
         # password with arg
         del document._diffdat[:]
         ddcnt = 0
         elm = document.password('wpassword', readonly=True, disabled=False,
-                            style='color: black', className='cls1 cls2',
-                            onchange=fnc2)
+                                tabindex='vtabindex', title='vtitle',
+                                style='color: black', className='cls1 cls2',
+                                onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'input')
         self.assertEqual(elm.type, 'password')
@@ -4279,6 +4437,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4294,6 +4454,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4368,9 +4532,10 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.range('wrange', min=-555, max=444, step=12,
-                              readonly=True, disabled=False,
-                              style='color: black', className='cls1 cls2',
-                              onchange=fnc2)
+                             readonly=True, disabled=False,
+                             tabindex='vtabindex', title='vtitle',
+                             style='color: black', className='cls1 cls2',
+                             onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'input')
         self.assertEqual(elm.type, 'range')
@@ -4381,6 +4546,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4403,6 +4570,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -4411,7 +4582,7 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # select no arg
+        # select no arg & with id
         ddcnt = test_value_id(document.select, 'select')
 
         # select with arg
@@ -4420,6 +4591,7 @@ class TestDominter(unittest.TestCase):
         elm = document.select('wselect', selectedIndex=19, name='nselect',
                               multiple='mselect', size=91,
                               readonly=True, disabled=False,
+                              tabindex='vtabindex', title='vtitle',
                               style='color: black', className='cls1 cls2',
                               onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -4431,6 +4603,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4452,6 +4626,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4510,6 +4688,7 @@ class TestDominter(unittest.TestCase):
         elm = document.option('voption', 'coption',
                               label='loption', selected=True,
                               readonly=True, disabled=False,
+                              tabindex='vtabindex', title='vtitle',
                               style='color: black', className='cls1 cls2',
                               onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
@@ -4521,6 +4700,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4541,6 +4722,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -4556,10 +4741,11 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.textarea('vtextarea',
-                               rows=89, cols=76,
-                               readonly=True, disabled=False,
-                               style='color: black', className='cls1 cls2',
-                               onchange=fnc2)
+                                rows=89, cols=76,
+                                readonly=True, disabled=False,
+                                tabindex='vtabindex', title='vtitle',
+                                style='color: black', className='cls1 cls2',
+                                onchange=fnc2)
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'textarea')
         self.assertEqual(elm.value, 'vtextarea')
@@ -4568,6 +4754,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
         self.assertEqual(elm.onchange, fnc2)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4585,6 +4773,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4633,12 +4825,15 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.table(readonly=True, disabled=False,
+                             tabindex='vtabindex', title='vtitle',
                              style='color: black', className='cls1 cls2',
                              childList=[elm1, elm2])
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'table')
         self.assertEqual(elm.readonly, True)
         self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         self.assertEqual(elm.childList, [elm1, elm2])
@@ -4651,6 +4846,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'readonly': True} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'disabled': False} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4700,10 +4899,13 @@ class TestDominter(unittest.TestCase):
         elm2 = document.createElement('button')
         elm3 = document.createElement('button')
         ddcnt += 3
-        elm = document.tr(style='color: black', className='cls1 cls2',
+        elm = document.tr(tabindex='vtabindex', title='vtitle',
+                          style='color: black', className='cls1 cls2',
                           childList=[elm3, elm2])
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'tr')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         self.assertEqual(elm.childList, [elm3, elm2])
@@ -4712,6 +4914,10 @@ class TestDominter(unittest.TestCase):
         s = ddd['_createElement']
         j = json.loads(s)
         self.assertEqual(j, {'_id': elm._id, 'tagName': 'tr'})
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4723,16 +4929,19 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # th no arg
+        # th no arg & with id
         ddcnt = test_textcontent_id(document.th, 'th')
 
         # th with arg
         del document._diffdat[:]
         ddcnt = 0
-        elm = document.th('thtext', style='color: black', className='cls1 cls2')
+        elm = document.th('thtext', tabindex='vtabindex', title='vtitle',
+                          style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'th')
         self.assertEqual(elm.textContent, 'thtext')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4743,22 +4952,29 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'textContent': 'thtext'} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # td no arg
+        # td no arg & with id
         ddcnt = test_textcontent_id(document.td, 'td')
 
         # td with arg
         del document._diffdat[:]
         ddcnt = 0
-        elm = document.td('tdtext', style='color: black', className='cls1 cls2')
+        elm = document.td('tdtext', tabindex='vtabindex', title='vtitle',
+                          style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'td')
         self.assertEqual(elm.textContent, 'tdtext')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4769,13 +4985,17 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'textContent': 'tdtext'} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # fieldset no arg
+        # fieldset no arg & with id
         ddcnt = test_textcontent_id(document.fieldset, 'fieldset')
 
         # fieldset with arg
@@ -4786,12 +5006,15 @@ class TestDominter(unittest.TestCase):
         del document._diffdat[:]
         ddcnt = 0
         elm = document.fieldset(textContent='cfieldset', disabled=False,
-                             style='color: black', className='cls1 cls2',
-                             childList=[elm1, elm2])
+                                tabindex='vtabindex', title='vtitle',
+                                style='color: black', className='cls1 cls2',
+                                childList=[elm1, elm2])
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'fieldset')
         self.assertEqual(elm.textContent, 'cfieldset')
         self.assertEqual(elm.disabled, False)
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         self.assertEqual(elm.childList, [elm1, elm2])
@@ -4802,6 +5025,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(j, {'_id': elm._id, 'tagName': 'fieldset'})
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'textContent': 'cfieldset'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4815,16 +5042,19 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # legend no arg
+        # legend no arg & with id
         ddcnt = test_textcontent_id(document.legend, 'legend')
 
         # legend with arg
         del document._diffdat[:]
         ddcnt = 0
-        elm = document.legend('legendtext', style='color: black', className='cls1 cls2')
+        elm = document.legend('legendtext', tabindex='vtabindex', title='vtitle',
+                              style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'legend')
         self.assertEqual(elm.textContent, 'legendtext')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4834,6 +5064,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(j, {'_id': elm._id, 'tagName': 'legend'})
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'textContent': 'legendtext'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4890,6 +5124,7 @@ class TestDominter(unittest.TestCase):
         elm = document.img('simg', alt='aimg', width=123, height=45,
                            crossorigin='cimg', longdesc='limg', sizes='szimg',
                            referrerpolicy='rpimg', srcset='ssimg',
+                           tabindex='vtabindex', title='vtitle',
                            style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'img')
@@ -4902,6 +5137,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.sizes, 'szimg')
         self.assertEqual(elm.referrerpolicy, 'rpimg')
         self.assertEqual(elm.srcset, 'ssimg')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -4927,6 +5164,10 @@ class TestDominter(unittest.TestCase):
         self.assertTrue({'_objid_': elm._id, 'referrerpolicy': 'rpimg'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'srcset': 'ssimg'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
@@ -4982,6 +5223,7 @@ class TestDominter(unittest.TestCase):
         ddcnt = 0
         elm = document.a('wa', 'ca', download='da', rel='ra',
                          target='ta', referrerpolicy='rpa',
+                         tabindex='vtabindex', title='vtitle',
                          style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'a')
@@ -4990,6 +5232,8 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(elm.rel, 'ra')
         self.assertEqual(elm.target, 'ta')
         self.assertEqual(elm.referrerpolicy, 'rpa')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -5010,24 +5254,31 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'target': 'ta'} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
 
-        # label no arg
+        # label no arg & with id
         ddcnt = test_textcontent_id(document.label, 'label')
 
         # label with arg
         del document._diffdat[:]
         ddcnt = 0
         elm = document.label('labeltext', for_='flabel',
+                             tabindex='vtabindex', title='vtitle',
                              style='color: black', className='cls1 cls2')
         self.assertEqual(type(elm), domdom.Element)
         self.assertEqual(elm.tagName, 'label')
         self.assertEqual(elm.textContent, 'labeltext')
         self.assertEqual(elm.for_, 'flabel')
+        self.assertEqual(elm.tabindex, 'vtabindex')
+        self.assertEqual(elm.title, 'vtitle')
         self.assertEqual(elm.style, {'color': 'black'})
         self.assertEqual(elm.className, 'cls1 cls2')
         ddd = document._diffdat[ddcnt]
@@ -5040,6 +5291,10 @@ class TestDominter(unittest.TestCase):
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'for_': 'flabel'} in document._diffdat)
         ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'tabindex': 'vtabindex'} in document._diffdat)
+        ddcnt += 1
+        self.assertTrue({'_objid_': elm._id, 'title': 'vtitle'} in document._diffdat)
+        ddcnt += 1
         self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2'} in document._diffdat)
         ddcnt += 1
         self.assertTrue({'_objid_': elm._id, '_setStyle': {'color': 'black'}} in document._diffdat)
@@ -5047,6 +5302,7 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(len(document._diffdat), ddcnt)
 
         def test_h1(fnc, name):
+            # h1 no arg & with id
             test_textcontent_id(fnc, name)
 
             # h1 with arg
@@ -5055,6 +5311,7 @@ class TestDominter(unittest.TestCase):
             elm = fnc('{}text'.format(name), accesskey='a{}'.format(name),
                       hidden='h{}'.format(name),
                       tabindex='t{}'.format(name),
+                      title='tt{}'.format(name),
                       style='{}: black'.format(name),
                       className='cls1 cls2 {}'.format(name))
             self.assertEqual(type(elm), domdom.Element)
@@ -5062,6 +5319,7 @@ class TestDominter(unittest.TestCase):
             self.assertEqual(elm.textContent, '{}text'.format(name))
             self.assertEqual(elm.accesskey, 'a{}'.format(name))
             self.assertEqual(elm.tabindex, 't{}'.format(name))
+            self.assertEqual(elm.title, 'tt{}'.format(name))
             self.assertEqual(elm.style, {name: 'black'})
             self.assertEqual(elm.className, 'cls1 cls2 {}'.format(name))
             ddd = document._diffdat[ddcnt]
@@ -5077,6 +5335,8 @@ class TestDominter(unittest.TestCase):
             self.assertTrue({'_objid_': elm._id, 'hidden': 'h{}'.format(name)} in document._diffdat)
             ddcnt += 1
             self.assertTrue({'_objid_': elm._id, 'tabindex': 't{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'title': 'tt{}'.format(name)} in document._diffdat)
             ddcnt += 1
             self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2 {}'.format(name)} in document._diffdat)
             ddcnt += 1
@@ -5093,6 +5353,7 @@ class TestDominter(unittest.TestCase):
         test_h1(document.h6, 'h6')
 
         def test_ol(fnc, name):
+            # ol no arg & with id
             test_noarg_tag_id(fnc, name)
             # ol with arg
             elm1 = document.createElement('button')
@@ -5102,6 +5363,7 @@ class TestDominter(unittest.TestCase):
             elm = fnc(accesskey='a{}'.format(name),
                       hidden='h{}'.format(name),
                       tabindex='t{}'.format(name),
+                      title='tt{}'.format(name),
                       style='{}: black'.format(name),
                       className='cls1 cls2 {}'.format(name),
                       childList=[elm1, elm2])
@@ -5109,6 +5371,7 @@ class TestDominter(unittest.TestCase):
             self.assertEqual(elm.tagName, name)
             self.assertEqual(elm.accesskey, 'a{}'.format(name))
             self.assertEqual(elm.tabindex, 't{}'.format(name))
+            self.assertEqual(elm.title, 'tt{}'.format(name))
             self.assertEqual(elm.style, {name: 'black'})
             self.assertEqual(elm.className, 'cls1 cls2 {}'.format(name))
             self.assertEqual(elm.childList, [elm1, elm2])
@@ -5124,6 +5387,8 @@ class TestDominter(unittest.TestCase):
             ddcnt += 1
             self.assertTrue({'_objid_': elm._id, 'tabindex': 't{}'.format(name)} in document._diffdat)
             ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'title': 'tt{}'.format(name)} in document._diffdat)
+            ddcnt += 1
             self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2 {}'.format(name)} in document._diffdat)
             ddcnt += 1
             self.assertTrue({'_objid_': elm._id, '_setStyle': {name: 'black'}} in document._diffdat)
@@ -5138,8 +5403,9 @@ class TestDominter(unittest.TestCase):
         test_ol(document.ul, 'ul')
 
         def test_li(fnc, name):
+            # li no arg & with id
             test_textcontent_id(fnc, name)
-            # ol with arg
+            # li with arg
             elm1 = document.createElement('button')
             elm2 = document.createElement('button')
             del document._diffdat[:]
@@ -5147,6 +5413,7 @@ class TestDominter(unittest.TestCase):
             elm = fnc('{}text'.format(name), accesskey='a{}'.format(name),
                       hidden='h{}'.format(name),
                       tabindex='t{}'.format(name),
+                      title='tt{}'.format(name),
                       style='{}: black'.format(name),
                       className='cls1 cls2 {}'.format(name),
                       childList=[elm1, elm2])
@@ -5155,6 +5422,7 @@ class TestDominter(unittest.TestCase):
             self.assertEqual(elm.textContent, '{}text'.format(name))
             self.assertEqual(elm.accesskey, 'a{}'.format(name))
             self.assertEqual(elm.tabindex, 't{}'.format(name))
+            self.assertEqual(elm.title, 'tt{}'.format(name))
             self.assertEqual(elm.style, {name: 'black'})
             self.assertEqual(elm.className, 'cls1 cls2 {}'.format(name))
             self.assertEqual(elm.childList, [elm1, elm2])
@@ -5171,6 +5439,8 @@ class TestDominter(unittest.TestCase):
             self.assertTrue({'_objid_': elm._id, 'hidden': 'h{}'.format(name)} in document._diffdat)
             ddcnt += 1
             self.assertTrue({'_objid_': elm._id, 'tabindex': 't{}'.format(name)} in document._diffdat)
+            ddcnt += 1
+            self.assertTrue({'_objid_': elm._id, 'title': 'tt{}'.format(name)} in document._diffdat)
             ddcnt += 1
             self.assertTrue({'_objid_': elm._id, 'className': 'cls1 cls2 {}'.format(name)} in document._diffdat)
             ddcnt += 1

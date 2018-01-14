@@ -5,11 +5,12 @@ dominter is a simple GUI (Graphical User Interface) Python package for small asy
 Features
 --------
 * JavaScript style API and other types of API that can be written shorter.
-* Any tag and attributes can be used.
+* Any tags and attributes can be used.
 * Supports 'click', 'change' and any events.
 * Supports multiple window.
 * Supports both multiple-instance and single-instance.
 * Supports Element.className and Element.style properties.
+* Depends only on `Tornado <http://www.tornadoweb.org>`_.
 
 Installation
 ------------
@@ -66,7 +67,7 @@ Example
     document.body.appendChild(tag_btn1)
     start_app(win)
 
-* 3 types of tag creation
+* Three types of tag creation and childList attribute
 
 .. code-block:: python
 
@@ -81,7 +82,7 @@ Example
     p2 = document.tag('p _="by tag() "')  # use '_=' for textContent
     # individual tag method
     p3 = document.p('by p() method. ')
-    document.body.childList.Expand([p1, p2, p3])
+    document.body.childList = [p1, p2, p3]
     start_app(win)
 
 Individual tag methods:
@@ -93,7 +94,6 @@ password, range, select, option,
 textarea, table, tr, th, td,
 fieldset, legend, img, a, label,
 h1, h2, h3, h4, h5, h6, ol, li, ul, section, header, footer
-
 
 * multiple window
 
@@ -164,7 +164,7 @@ h1, h2, h3, h4, h5, h6, ol, li, ul, section, header, footer
 
 Status
 ------
-Pre-alpha
+Alpha
 
 
 | Copyright (c) 2017-2018 Tamini Bean

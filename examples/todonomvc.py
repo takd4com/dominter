@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-"""
-dominter todo NO MVC example
-This is a deterioration copy of http://todomvc.com/examples.
-"""
-
+# dominter todo NO MVC example
+# This is a deterioration copy of http://todomvc.com/examples.
 import os
 from logging import (getLogger, StreamHandler, basicConfig,
                       DEBUG, INFO, WARN, ERROR)
@@ -18,19 +15,19 @@ class MyWindow(Window):
         super(MyWindow, self).__init__()
 
         d = self.document
-        self.root = d.section(child=(
-            d.header(id_='header', child=(
+        self.root = d.section(childList=(
+            d.header(id_='header', childList=(
                 d.h1('todos'),
                 d.text(id_='new_todo', placeholder='What needs to be done?'),
             )),
-            #d.section(id_='main', style='display: none;', child=(
-            d.section(id_='main', child=(
+            #d.section(id_='main', style='display: none;', childList=(
+            d.section(id_='main', childList=(
                 d.checkbox(id_='toggle_all'),
                 d.label('Mark all as complete', for_='toggle_all'),
                 d.ul(id_='todo_list'),
             )),
-            #d.footer(id_='footer', style='display: none;', child=(
-            d.footer(id_='footer', child=(
+            #d.footer(id_='footer', style='display: none;', childList=(
+            d.footer(id_='footer', childList=(
                 d.span('0', id_='count'),
                 d.span(' items left '),
                 d.label('All'),
@@ -66,8 +63,8 @@ class MyWindow(Window):
     def add_todo(self, txt):
         info = {'checked': False}
         d = self.document
-        elm = d.li(child=(
-            d.div(className='view', child=(
+        elm = d.li('', childList=(
+            d.div(className='view', childList=(
                 d.checkbox(onchange=self.on_todo_check),
                 d.label(txt),
                 d.button('x', className='destroy', onclick=self.on_todo_destroy),
@@ -84,14 +81,14 @@ class MyWindow(Window):
 
     def get_label_by_chk(self, chk):
         div =chk.parent
-        label = div.child[1]
+        label = div.childList[1]
         return label
 
     def get_chk_by_li(self, li):
-        return li.child[0].child[0]
+        return li.childList[0].childList[0]
 
     def get_chk_list(self):
-        return [li.child[0].child[0] for li in self.todo_list.child]
+        return [li.childList[0].childList[0] for li in self.todo_list.childList]
 
     def on_todo_destroy(self, ev):
         chk = self.document.getElementById(ev['targetId'])
@@ -136,7 +133,7 @@ class MyWindow(Window):
         elm = self.document.getElementById(ev['targetId'])
         if elm is None:
             return
-        for li in self.todo_list.child:
+        for li in self.todo_list.childList:
             chk = self.get_chk_by_li(li)
             done = chk.checked
             display = (
@@ -146,11 +143,11 @@ class MyWindow(Window):
             li.style['display'] = 'list-item' if display else 'None'
 
     def on_clear_completed(self, ev):
-        lst = [(self.get_chk_by_li(li), li) for li in self.todo_list.child]
+        lst = [(self.get_chk_by_li(li), li) for li in self.todo_list.childList]
         for chk, li in lst:
             if chk.checked:
                 # self.todo_list.removeChild(li)
-                self.todo_list.child.remove(li)
+                self.todo_list.childList.remove(li)
 
 
 def main():
