@@ -601,6 +601,12 @@ class Element(object):
             self.document._add_diff({_OBJKEY_: self._id, '_removeEventListener': [type_, name, ]})
             del(self.document._handlers[name])
 
+    def focus(self):
+        self.document._add_diff({_OBJKEY_: self._id, '_focus': True})
+
+    def blur(self):
+        self.document._add_diff({_OBJKEY_: self._id, '_blur': True})
+
     def _dumps(self):
         # self.onload()
         str = json.dumps(self, default=self._serializer, indent=2)

@@ -96,6 +96,7 @@ class MyWindow(Window):
         self.editbox.addEventListener('change', self.on_edit_change)
         self.editbox.addEventListener('keyup', self.on_edit_keyup)
         target.appendChild(self.editbox)
+        self.editbox.focus()
 
     def on_edit_blur(self, ev):
         if 'targetId' not in ev:
@@ -118,11 +119,15 @@ class MyWindow(Window):
         if 'targetId' not in ev:
             return
         keycode = ev['keyCode']
+        doc = self.document
         if keycode == 27:
             # escape
-            doc = self.document
             target = doc.getElementById(ev['targetId'])
             self.edit_end(target, False)
+        # blur() test
+        # elif keycode == 66:  # 'b'
+        #    target = doc.getElementById(ev['targetId'])
+        #    target.blur()
 
     def edit_end(self, target, done=True):
         parent = target.parent

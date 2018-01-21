@@ -356,6 +356,12 @@
           var fnc = lst[1];
           removeEventHandler(elm, typ, fnc);
         }
+        if ('_focus' in dat) {
+          elm.focus();
+        }
+        if ('_blur' in dat) {
+          elm.blur();
+        }
       }
       if ('_createElement' in dat) {
         var d = dat['_createElement'];
