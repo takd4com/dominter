@@ -48,6 +48,11 @@
           dic['selectedIndex'] = ev.target.selectedIndex;
         }
       }
+      else if (('keypress' == type_)||
+                ('keyup' == type_)||
+                ('keydown' == type_)) {
+        dic['value'] = ev.target.value;
+      }
       var js = JSON.stringify(dic);
       ws.send(js);
       return true;

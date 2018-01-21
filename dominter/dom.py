@@ -1534,6 +1534,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
                 obj = objdic[id_]
                 if 'value' in dic:
                     obj.value = dic['value']
+                    # print('set by {} {}.value={}'.format(type_, id_, obj.value))
                 if 'selectedIndex' in dic:
                     obj.selectedIndex = dic['selectedIndex']
                 if 'checked' in dic:
@@ -1553,6 +1554,12 @@ class WsHandler(tornado.websocket.WebSocketHandler):
             if id_ in self.window.document._handlers:
                 fnc = self.window.document._handlers[id_]
                 if callable(fnc):
+                    if ('keypress' == type_ or
+                       'keyup' == type_ or 'keydown' == type_):
+                        tid = dic['targetId']
+                        target = doc.getElementById(tid)
+                        target.value = dic['value']
+                        # print('set by {} {}.value={}'.format(type_, tid, target.value))
                     doc._clean_diff()
                     fnc(dic)
                     #del#if 0 < len(doc._diffdat):
