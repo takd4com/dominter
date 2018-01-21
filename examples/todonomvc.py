@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # dominter todo NO MVC example
-# This is a deterioration copy of http://todomvc.com/examples.
+# This is a poor copy of http://todomvc.com/examples.
 import os
 from logging import (getLogger, StreamHandler, basicConfig,
                       DEBUG, INFO, WARN, ERROR)
@@ -13,46 +13,52 @@ logger = getLogger(__name__)
 class MyWindow(Window):
     def __init__(self):
         super(MyWindow, self).__init__()
+        doc = self.document
 
-        d = self.document
-        self.root = d.section(childList=(
-            d.header(id_='header', childList=(
-                d.h1('todos'),
-                d.text(id_='new_todo', placeholder='What needs to be done?'),
-            )),
-            #d.section(id_='main', style='display: none;', childList=(
-            d.section(id_='main', childList=(
-                d.checkbox(id_='toggle_all'),
-                d.label('Mark all as complete', for_='toggle_all'),
-                d.ul(id_='todo_list'),
-            )),
-            #d.footer(id_='footer', style='display: none;', childList=(
-            d.footer(id_='footer', childList=(
-                d.span('0', id_='count'),
-                d.span(' items left '),
-                d.label('All'),
-                d.radio(value='All', name='sel', id_='sel_all'),
-                d.label('Active'),
-                d.radio(value='Active', name='sel', id_='sel_active'),
-                d.label('Completed'),
-                d.radio(value='Completed', name='sel', id_='sel_completed'),
-                d.button('Clear completed', id_='clear_completed'),
-            )),
-        ))
-        self.header = d.getElementById('header')
-        self.new_todo = d.getElementById('new_todo')
-        self.main = d.getElementById('main')
-        self.toggle_all = d.getElementById('toggle_all')
-        self.todo_list = d.getElementById('todo_list')
-        self.footer = d.getElementById('footer')
-        self.count = d.getElementById('count')
-        self.sel_all = d.getElementById('sel_all')
-        self.sel_active = d.getElementById('sel_active')
-        self.sel_completed = d.getElementById('sel_completed')
-        self.clear_completed = d.getElementById('clear_completed')
-        self.document.body.appendChild(self.root)
+        # elements
+        self.header = doc.header()
+        self.new_todo = doc.text(placeholder='What needs to be done?')
+        self.main = doc.section()
+        self.toggle_all = doc.checkbox()
+        self.todo_list = doc.ul()
+        self.footer = doc.footer()
+        self.count = doc.span('0')
+        self.sel_all = doc.radio(value='All', name='sel', checked=True)
+        self.sel_active = doc.radio(value='Active', name='sel')
+        self.sel_completed = doc.radio(value='Completed', name='sel')
+        self.clear_completed = doc.button('Clear completed')
+        self.editbox = None
 
-        # dmy = d.createElement('dmy')
+        # view
+        self.document.body.childList = [
+            doc.section(childList=[
+                self.header,
+                self.main,
+                self.footer,
+            ]),
+        ]
+        self.header.childList = [
+            doc.h1('todos'),
+            self.new_todo,
+        ]
+        self.main.childList = [
+            self.toggle_all,
+            doc.label('Mark all as complete', for_='toggle_all'),
+            self.todo_list,
+        ]
+        self.footer.childList = [
+            self.count,
+            doc.span(' items left '),
+            doc.label('All'),
+            self.sel_all,
+            doc.label('Active'),
+            self.sel_active,
+            doc.label('Completed'),
+            self.sel_completed,
+            self.clear_completed,
+        ]
+
+        # handlers
         self.new_todo.addEventListener('change', self.on_new_todo)
         self.toggle_all.addEventListener('change', self.on_toggle_all)
         self.sel_all.addEventListener('change', self.on_sel_change)
@@ -61,18 +67,71 @@ class MyWindow(Window):
         self.clear_completed.addEventListener('click', self.on_clear_completed)
 
     def add_todo(self, txt):
-        info = {'checked': False}
-        d = self.document
-        elm = d.li('', childList=(
-            d.div(className='view', childList=(
-                d.checkbox(onchange=self.on_todo_check),
-                d.label(txt),
-                d.button('x', className='destroy', onclick=self.on_todo_destroy),
+        doc = self.document
+        itm = doc.label(txt)
+        itm.addEventListener('dblclick', self.on_edit_item)
+        elm = doc.li('', childList=(
+            doc.div(className='view', childList=(
+                doc.checkbox(onchange=self.on_todo_check),
+                itm,
+                doc.button('x', className='destroy', onclick=self.on_todo_destroy),
             )),
         ))
         self.todo_list.appendChild(elm)
         self.set_left()
         self.new_todo.value = ''
+
+    def on_edit_item(self, ev):
+        if 'targetId' not in ev:
+            return
+        doc = self.document
+        target = doc.getElementById(ev['targetId'])
+        if target is None:
+            return
+        title = target.textContent
+        target.classList.append('editing')
+        self.editbox = doc.text(title)
+        self.editbox.className = 'edit'
+        self.editbox.addEventListener('blur', self.on_edit_blur)
+        self.editbox.addEventListener('change', self.on_edit_change)
+        self.editbox.addEventListener('keyup', self.on_edit_keyup)
+        target.appendChild(self.editbox)
+
+    def on_edit_blur(self, ev):
+        if 'targetId' not in ev:
+            return
+        doc = self.document
+        target = doc.getElementById(ev['targetId'])
+        self.edit_end(target, True)
+
+    def on_edit_change(self, ev):
+        if 'targetId' not in ev:
+            return
+        #done
+        doc = self.document
+        target = doc.getElementById(ev['targetId'])
+        self.edit_end(target, True)
+
+    def on_edit_keyup(self, ev):
+        if 'keyCode' not in ev:
+            return
+        if 'targetId' not in ev:
+            return
+        keycode = ev['keyCode']
+        if keycode == 27:
+            # escape
+            doc = self.document
+            target = doc.getElementById(ev['targetId'])
+            self.edit_end(target, False)
+
+    def edit_end(self, target, done=True):
+        parent = target.parent
+        if parent is None:
+            return
+        if done:
+            parent.textContent = target.value
+        parent.classList.remove('editing')
+        parent.removeChild(target)
 
     def get_li_by_chk(self, chk):
         div =chk.parent
@@ -120,14 +179,13 @@ class MyWindow(Window):
             itm.checked = val
             self.change_check(itm, val)
 
-    def left_count(self):
-        cnt = 0
-        for itm in self.get_chk_list():
-            cnt += 0 if itm.checked else 1
-        return cnt
-
     def set_left(self):
-        self.count.textContent = self.left_count()
+        all, cnt = 0, 0
+        for itm in self.get_chk_list():
+            all += 1
+            cnt += 0 if itm.checked else 1
+        self.count.textContent = cnt
+        self.toggle_all.checked = 0 < all and 0 == cnt
 
     def on_sel_change(self, ev):
         elm = self.document.getElementById(ev['targetId'])
