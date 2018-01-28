@@ -30,6 +30,9 @@ class MyWindow(Window):
         self.editbox = None
 
         # view
+        self.document.head.childList = [
+            doc.style('label.editing { color: red; } ')
+        ]
         self.document.body.childList = [
             doc.section(childList=[
                 self.header,
