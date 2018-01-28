@@ -10,6 +10,7 @@ import json
 import shlex
 import re
 import collections
+import threading
 from inspect import isclass
 from logging import (getLogger, basicConfig, DEBUG, INFO, WARN, ERROR)
 
@@ -827,6 +828,7 @@ class Document(object):
         self._handlers = {}
         self.head = Element(self, 'head')
         self.body = Element(self, 'body')
+        self._window_info = Element(self, '_window_info')
         self._cache = None
 
     def _clean_diff(self):
@@ -1441,6 +1443,10 @@ class Window(object):
         self.document = Document()
         #self.location = ''
         #self.name = ''
+        self._handler = None
+
+    def set_handler(self, handler):
+        self._handler = handler
 
     def _dumps(self):
         if self.document._dirty_cache:
@@ -1463,6 +1469,17 @@ class Window(object):
             return name
         raise TypeError(repr(obj) + " is not serializable!")
 
+    def invoke(self, fnc, *args, **kwargs):
+        # invoke fnc   * thread safe
+        if self._handler is None:
+            return False
+
+        def f():
+            fnc(*args, **kwargs)
+            self._handler.sync()
+        #tornado.ioloop.IOLoop.current().add_callback(fnc, *args, **kwargs)
+        tornado.ioloop.IOLoop.current().add_callback(f)
+        return True
 
 class GetHandler(tornado.web.RequestHandler):
     """
@@ -1510,15 +1527,18 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         as multiple instance. if instance is given, it acts as single instance.
         :return: None
         """
+        # logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
         self.ismulti = False
         if isclass(window):
             self.ismulti = True
             self.window = window()
         else:
             self.window = window
+        self.window.set_handler(self)
 
     def open(self):
         logger.debug('open connection: {}'.format(self))
+        # logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
         wins = str(self.window)
         if wins not in self.clients:
             self.clients[wins] = []
@@ -1533,6 +1553,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         type_ = dic['type']
         id_ = dic['id']
         logger.debug('id: {} type:{}'.format(id_, type_))
+        # logger.debug("thread:{} self:{} id: {} type:{}".format(threading.current_thread().ident, self, id_, type_))
         # system handler
         if 'change' == type_:
             objdic = self.window.document._obj_dic
@@ -1568,12 +1589,16 @@ class WsHandler(tornado.websocket.WebSocketHandler):
                         # print('set by {} {}.value={}'.format(type_, tid, target.value))
                     doc._clean_diff()
                     fnc(dic)
-                    #del#if 0 < len(doc._diffdat):
-                    if doc._dirty_diff:
-                        # self.write_message({'diff': doc._diffdat})
-                        logger.debug('broadcast diff: {}'.format(len(doc._diffdat)))
-                        self.broadcast({'diff': doc._diffdat})
-                        doc._clean_diff()
+                    self.sync()
+
+    def sync(self):
+        doc = self.window.document
+        # del#if 0 < len(doc._diffdat):
+        if doc._dirty_diff:
+            # self.write_message({'diff': doc._diffdat})
+            logger.debug('broadcast diff: {}'.format(len(doc._diffdat)))
+            self.broadcast({'diff': doc._diffdat})
+            doc._clean_diff()
 
     def broadcast(self, msg):
         cnt = 0
@@ -1590,6 +1615,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
 
     def on_close(self):
         logger.debug('close connection: {}'.format(self))
+        # logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
         wins = str(self.window)
         if self in self.clients[wins]:
             self.clients[wins].remove(self)
@@ -1698,7 +1724,7 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
                                       static_path=static_path)
 
     def periodic():
-        # print('periodic!')
+        logger.debug("thread:{}".format(threading.current_thread().ident))
         for win in winlst:
             if not isclass(win):
                 # create cache if single instance
@@ -1716,4 +1742,4 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
 
 
 def version():
-    return '0.1.0'
+    return '0.2.0pre'
