@@ -11,6 +11,7 @@ import shlex
 import re
 import collections
 import threading
+import functools
 from inspect import isclass
 from logging import (getLogger, basicConfig, DEBUG, INFO, WARN, ERROR)
 
@@ -20,7 +21,6 @@ import tornado.websocket
 
 
 logger = getLogger(__name__)
-
 _OBJKEY_ = '_objid_'
 
 
@@ -342,6 +342,49 @@ class Style(dict):
             self.__delitem__(key)
         return res
 
+
+class ThreadSafe(object):
+    _disabled = False
+    _tornado_thread_id = None
+
+    @classmethod
+    def set_tornado_thread_id(cls):
+        # must call from tornado thread
+        cls._tornado_thread_id = threading.current_thread().ident
+
+    @classmethod
+    def invoke_required(cls):
+        if cls._disabled:
+            return False
+        elif cls._tornado_thread_id is None:
+            return False
+        elif cls._tornado_thread_id == threading.current_thread().ident:
+            return False
+        else:
+            return True
+
+    @classmethod
+    def enable(cls):
+        cls._disabled = False
+
+    @classmethod
+    def disable(cls):
+        cls._disabled = True
+
+
+# decorator PENDING
+def element_thread_safe(fnc):
+    @functools.wraps(fnc)
+    def wrap(self, *args, **kwargs):
+        if (not ThreadSafe.invoke_required() or
+                not hasattr(self, '_in_init_') or
+                self._in_init_):
+            return fnc(self, *args, **kwargs)
+        else:
+            self.document.window.invoke(fnc, self, *args, **kwargs)
+    return wrap
+
+
 class Element(object):
     """
     virtual element class
@@ -402,7 +445,9 @@ class Element(object):
             if (not self._in_init_) and (key not in self.dif_excepts):
                 self.document._add_diff({_OBJKEY_: self._id, key: value})
 
+    # @element_thread_safe # PENDING
     def __setattr__(self, key, value):
+        # logger.debug('thread:{} key:{} value:{}'.format(threading.current_thread().ident, key, value))
         self._pre_setattr(key, value)
         super(Element, self).__setattr__(key, value)
 
@@ -439,6 +484,9 @@ class Element(object):
 
     @childList.setter
     def childList(self, lst):
+        self._set_child_list(lst)
+
+    def _set_child_list(self, lst):
         if 0 < len(self._childList):
             self._childList.clear()
         for elm in lst:
@@ -470,6 +518,9 @@ class Element(object):
 
     @style.setter
     def style(self, value):
+        self._set_style(value)
+
+    def _set_style(self, value):
         self._style.cssText = value
 
     def _addhandler(self, fnc):
@@ -573,7 +624,8 @@ class Element(object):
     def setAttribute(self, name, value):
         if 'style' == name:
             # self._style.set_text(value)
-            self.style.cssText = value
+            # self.style.cssText = value
+            self._set_style(value)
         elif 'class' == name:
             self.className = value
         else:
@@ -820,7 +872,7 @@ class Document(object):
     """
     virtual document class
     """
-    def __init__(self):
+    def __init__(self, window):
         self._dirty_diff = False
         self._dirty_cache = True
         self._obj_dic = {}
@@ -828,6 +880,7 @@ class Document(object):
         self._handlers = {}
         self.head = Element(self, 'head')
         self.body = Element(self, 'body')
+        self.window = window
         self._window_info = Element(self, '_window_info')
         self._cache = None
 
@@ -1435,18 +1488,35 @@ class Document(object):
                                 childList=childList)
 
 
+# decorator PENDING
+def window_thread_safe(fnc):
+    @functools.wraps(fnc)
+    def wrap(self, *args, **kwargs):
+        if ThreadSafe.invoke_required():
+            self.invoke(fnc, self, *args, **kwargs)
+        else:
+            return fnc(self, *args, **kwargs)
+    return wrap
+
+
 class Window(object):
     """
     virtual window class
     """
     def __init__(self):
-        self.document = Document()
+        self.document = Document(self)
         #self.location = ''
         #self.name = ''
-        self._handler = None
+        self._socks = []
+        # self._timeout_dic = {}
+        # self._timeout_id = 0
 
-    def set_handler(self, handler):
-        self._handler = handler
+    def add_sock(self, sock):
+        self._socks.append(sock)
+
+    def remove_sock(self, sock):
+        if sock in self._socks:
+            self._socks.remove(sock)
 
     def _dumps(self):
         if self.document._dirty_cache:
@@ -1469,17 +1539,46 @@ class Window(object):
             return name
         raise TypeError(repr(obj) + " is not serializable!")
 
+    def sync(self):
+        if 0 < len(self._socks):
+            self._socks[0].sync()
+
     def invoke(self, fnc, *args, **kwargs):
         # invoke fnc   * thread safe
-        if self._handler is None:
-            return False
+        logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
 
         def f():
             fnc(*args, **kwargs)
-            self._handler.sync()
-        #tornado.ioloop.IOLoop.current().add_callback(fnc, *args, **kwargs)
+            self.sync()
         tornado.ioloop.IOLoop.current().add_callback(f)
         return True
+
+    def set_timeout(self, fnc, delay, *args, **kwargs):
+        logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
+
+        def f():
+            fnc(*args, **kwargs)
+            self.sync()
+        # self._timeout_id += 1
+        hdl = tornado.ioloop.IOLoop.current().call_later(delay, f)
+        # self._timeout_dic[self._timeout_id] = hdl
+        # return self._timeout_id
+        return hdl
+
+    # @window_thread_safe # PENDING
+    def remove_timeout(self, hdl):
+        # hdl = self._timeout_dic.get(timeout_id)
+        if hdl is None:
+            logger.error('unknown timer_id')
+            return False
+        else:
+            tornado.ioloop.IOLoop.current().remove_timeout(hdl)
+            return True
+
+    @staticmethod
+    def invoke_required():
+        return ThreadSafe.invoke_required()
+
 
 class GetHandler(tornado.web.RequestHandler):
     """
@@ -1534,11 +1633,11 @@ class WsHandler(tornado.websocket.WebSocketHandler):
             self.window = window()
         else:
             self.window = window
-        self.window.set_handler(self)
+        self.window.add_sock(self)
 
     def open(self):
-        logger.debug('open connection: {}'.format(self))
-        # logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
+        # logger.debug('open connection: {}'.format(self))
+        logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
         wins = str(self.window)
         if wins not in self.clients:
             self.clients[wins] = []
@@ -1616,6 +1715,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
     def on_close(self):
         logger.debug('close connection: {}'.format(self))
         # logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
+        self.window.remove_sock(self)
         wins = str(self.window)
         if self in self.clients[wins]:
             self.clients[wins].remove(self)
@@ -1738,6 +1838,7 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
         # background worker to create cache
         tornado.ioloop.PeriodicCallback(periodic, background_msec,
                                         io_loop=ioloop).start()
+    ioloop.add_callback(ThreadSafe.set_tornado_thread_id)
     ioloop.start()
 
 
