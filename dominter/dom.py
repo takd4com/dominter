@@ -881,7 +881,7 @@ class Document(object):
         self.head = Element(self, 'head')
         self.body = Element(self, 'body')
         self.window = window
-        self._window_info = Element(self, '_window_info')
+        self._window_element = Element(self, '_window_element')
         self._cache = None
 
     def _clean_diff(self):
@@ -1505,11 +1505,9 @@ class Window(object):
     """
     def __init__(self):
         self.document = Document(self)
-        #self.location = ''
         #self.name = ''
         self._socks = []
-        # self._timeout_dic = {}
-        # self._timeout_id = 0
+        self.location = None
 
     def add_sock(self, sock):
         self._socks.append(sock)
@@ -1531,7 +1529,8 @@ class Window(object):
     @staticmethod
     def _serializer(obj):
         if isinstance(obj, Document):
-            return {'head': obj.head, 'body': obj.body}
+            return {'head': obj.head, 'body': obj.body,
+                    '_window_element': obj._window_element, }
         if isinstance(obj, Element):
             return Element._serializer(obj)
         if callable(obj):
@@ -1578,6 +1577,24 @@ class Window(object):
     @staticmethod
     def invoke_required():
         return ThreadSafe.invoke_required()
+
+    def addEventListener(self, type_, listener):
+        elm = self.document._window_element
+        elm._eventlisteners.append((type_, listener))
+        name = elm._addhandler(listener)
+        self.document._add_diff({_OBJKEY_: '_window_handler', '_addEventListener': [type_, name, ]})
+
+    def removeEventListener(self, type_, listener):
+        elm = self.document._window_element
+        tpl = (type_, listener)
+        if tpl in elm._eventlisteners:
+            elm._eventlisteners.remove(tpl)
+            name = repr(listener)
+            self.document._add_diff({_OBJKEY_: '_window_handler', '_removeEventListener': [type_, name, ]})
+            del(self.document._handlers[name])
+
+    # def onload(self, ev): # called when uesr defined
+    #    logger.debug('default onload. location:{}'.format(self.location))
 
 
 class GetHandler(tornado.web.RequestHandler):
@@ -1645,17 +1662,27 @@ class WsHandler(tornado.websocket.WebSocketHandler):
             self.clients[wins].append(self)
         if self.window is not None:
             dat = self.window._dumps()
+            logger.debug('thread:{} self:{} send window dat(len={})'.format(threading.current_thread().ident, self, len(dat)))
             self.write_message(dat)
+        else:
+            logger.warn('thread:{} self:{} no window dat'.format(threading.current_thread().ident, self))
 
     def on_message(self, msg):
         dic = json.loads(msg)
         type_ = dic['type']
         id_ = dic['id']
         logger.debug('id: {} type:{}'.format(id_, type_))
+        win = self.window
         # logger.debug("thread:{} self:{} id: {} type:{}".format(threading.current_thread().ident, self, id_, type_))
         # system handler
+        if 'open' == type_:
+            win.location = dic.get('location')
+            if hasattr(win, 'onload'):
+                win.onload(None)
+                self.sync()
+            return
         if 'change' == type_:
-            objdic = self.window.document._obj_dic
+            objdic = win.document._obj_dic
             if id_ in objdic:
                 obj = objdic[id_]
                 if 'value' in dic:
@@ -1666,7 +1693,6 @@ class WsHandler(tornado.websocket.WebSocketHandler):
                 if 'checked' in dic:
                     obj.checked = dic['checked']
                     if obj.type == 'radio' and obj.checked:
-                        # radiobuttonのcheckedは自分ではずさないといけない
                         group = self.window.document.getElementsByName(obj.name)
                         if group is not None:
                             for elm in group:
@@ -1675,10 +1701,10 @@ class WsHandler(tornado.websocket.WebSocketHandler):
                 # boradcast if single instance
                 self.broadcast(msg)
         # user handler
-        if self.window is not None:
-            doc = self.window.document
-            if id_ in self.window.document._handlers:
-                fnc = self.window.document._handlers[id_]
+        if win is not None:
+            doc = win.document
+            if id_ in doc._handlers:
+                fnc = doc._handlers[id_]
                 if callable(fnc):
                     if ('keypress' == type_ or
                        'keyup' == type_ or 'keydown' == type_):
@@ -1824,7 +1850,7 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
                                       static_path=static_path)
 
     def periodic():
-        logger.debug("thread:{}".format(threading.current_thread().ident))
+        # logger.debug("thread:{}".format(threading.current_thread().ident))
         for win in winlst:
             if not isclass(win):
                 # create cache if single instance

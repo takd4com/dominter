@@ -131,6 +131,23 @@
     return elm;
   };
 
+  var newWindow = function(ws, dat) {
+    var elm = window;
+    for (var pr in dat) {
+      if (0 > excepts.indexOf(pr)) {
+        elm[pr] = dat[pr];
+      }
+    }
+    var val = dat['_eventlisteners']
+    if (val) {
+      for (var tpl of val) {
+        var typ = tpl[0];
+        var fnc = tpl[1];
+        elm.addEventListener(typ, createEventHandler(ws, typ, fnc), false);
+      }
+    }
+  }
+
   var appendElements = function(ws, parent, lst) {
     for (var dat of lst) {
       var tagname = dat['tagName'];
@@ -169,6 +186,9 @@
   var ws = new WebSocket(url);
 
   ws.onopen = function(ev) {
+    var dic = {'type': 'open', 'id': 'window', 'location': window.location};
+    var js = JSON.stringify(dic);
+    ws.send(js);
   };
 
   var findElm = function(dic, eid) {
@@ -183,6 +203,21 @@
     var newdic = {};
     for (var dat of dic[name]) {
       var objid = dat['_objid_'];
+      if (objid == '_window_handler') {
+        if ('_addEventListener' in dat) {
+          var lst = dat['_addEventListener'];
+          var typ = lst[0];
+          var fnc = lst[1];
+          window.addEventListener(typ, createEventHandler(ws, typ, fnc), false);
+        }
+        if ('_removeEventListener' in dat) {
+          var lst = dat['_removeEventListener'];
+          var typ = lst[0];
+          var fnc = lst[1];
+          removeEventHandler(window, typ, fnc);
+        }
+        continue;
+      }
       var elm = document.getElementById(objid);
       if (!elm) {
         if (objid == headId) {
@@ -351,7 +386,7 @@
           elm.addEventListener(typ, createEventHandler(ws, typ, fnc), false);
         }
         if ('_removeEventListener' in dat) {
-          var lst = dat['_addEventListener'];
+          var lst = dat['_removeEventListener'];
           var typ = lst[0];
           var fnc = lst[1];
           removeEventHandler(elm, typ, fnc);
@@ -412,6 +447,10 @@
         appendElements(ws, document.body, body['_childList']);
       }
       bodyId = body._id;
+    }
+    if ('_window_element' in dic) {
+      var dat = dic['_window_element'];
+      newWindow(ws, dat);
     }
     if ('diff' in dic) {
       diffproc(ws, dic, 'diff');
