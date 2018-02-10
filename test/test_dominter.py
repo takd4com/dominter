@@ -652,10 +652,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(s3['ef-gh'], 'bb')
         self.assertEqual(s3['efGh'], 'bb')
         ddd = document._diffdat[ddcnt]
-        self.assertEqual(ddd['_setStyle'], {'ab-cd': 'aa'})
+        self.assertTrue((ddd['_setStyle'], {'ab-cd': 'aa'}) or (ddd['_setStyle'], {'ef-gh': 'bb'}))
         ddcnt += 1
         ddd = document._diffdat[ddcnt]
-        self.assertEqual(ddd['_setStyle'], {'ef-gh': 'bb'})
+        self.assertTrue((ddd['_setStyle'], {'ab-cd': 'aa'}) or (ddd['_setStyle'], {'ef-gh': 'bb'}))
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
         s3.update([('ijKl', 'cc'), ('mn-op', 'dd')])
@@ -669,10 +669,10 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(s3['mn-op'], 'dd')
         self.assertEqual(s3['mnOp'], 'dd')
         ddd = document._diffdat[ddcnt]
-        self.assertEqual(ddd['_setStyle'], {'ij-kl': 'cc'})
+        self.assertTrue((ddd['_setStyle'] == {'ij-kl': 'cc'}) or (ddd['_setStyle'] == {'mn-op': 'dd'}))
         ddcnt += 1
         ddd = document._diffdat[ddcnt]
-        self.assertEqual(ddd['_setStyle'], {'mn-op': 'dd'})
+        self.assertTrue((ddd['_setStyle'] == {'ij-kl': 'cc'}) or (ddd['_setStyle'] == {'mn-op': 'dd'}))
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
         # copy 2
