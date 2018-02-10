@@ -574,7 +574,6 @@ class TestDominter(unittest.TestCase):
             'STU': 'stu7',
             'vWx': 'vwx8',
         })
-        s3bb = s3.copy()
         self.assertEqual(len(s3), 8)
         ddcnt = len(document._diffdat)
         x = s3.pop('aBc')
@@ -616,27 +615,28 @@ class TestDominter(unittest.TestCase):
         self.assertEqual(ddd['_deleteStyle'], ['p-qr', ])
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
+        # setdefault
+        x = s3.setdefault('GHI', 'uuu')
+        self.assertEqual(x, 'ghi3')
+        self.assertEqual(len(s3), 3)
+        self.assertEqual(len(document._diffdat), ddcnt)
+        x = s3.setdefault('ggg', 'uuu')
+        self.assertEqual(x, 'uuu')
+        self.assertEqual(len(s3), 4)
+        self.assertEqual(s3['ggg'], 'uuu')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_setStyle'], {'ggg': 'uuu'})
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        s3bb = s3.copy()
         # popitem
         x = s3.popitem()
-        self.assertEqual(len(s3), 2)
-        self.assertTrue(x[1] in ['ghi3', 'stu7', 'vwx8', ])
+        self.assertEqual(len(s3), 3)
+        self.assertTrue(x[1] in ['ghi3', 'stu7', 'vwx8', 'uuu'])
         self.assertTrue(s3bb[x[0]], x[1])
         self.assertFalse(x[0] in s3)
         ddd = document._diffdat[ddcnt]
         self.assertEqual(ddd['_deleteStyle'], [x[0], ])
-        ddcnt += 1
-        self.assertEqual(len(document._diffdat), ddcnt)
-        # setdefault
-        x = s3.setdefault('GHI', 'uuu')
-        self.assertEqual(x, 'ghi3')
-        self.assertEqual(len(s3), 2)
-        self.assertEqual(len(document._diffdat), ddcnt)
-        x = s3.setdefault('ggg', 'uuu')
-        self.assertEqual(x, 'uuu')
-        self.assertEqual(len(s3), 3)
-        self.assertEqual(s3['ggg'], 'uuu')
-        ddd = document._diffdat[ddcnt]
-        self.assertEqual(ddd['_setStyle'], {'ggg': 'uuu'})
         ddcnt += 1
         self.assertEqual(len(document._diffdat), ddcnt)
         # update
