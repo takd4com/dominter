@@ -292,15 +292,40 @@ class Style(dict):
         self.__delitem__(key)
 
     def pop(self, key, *args):
-        if key in self:
-            val = self[key]
-            self.__delitem__(key)
+        ik = self.attr2item_key(key)
+        if ik in self:
+            val = self[ik]
+            self.__delitem__(ik)
             return val
         else:
             if 0 < len(args):
                 return args[0]
             else:
                 raise TypeError
+
+    def popitem(self):
+        res = super(Style, self).popitem()
+        key, value = res
+        self.elm._style_delete(key)
+        return res
+
+    def setdefault(self, key, default):
+        ik = self.attr2item_key(key)
+        if ik not in self:
+            super(Style, self).__setitem__(ik, default)
+            self.elm._style_set(ik, default)
+        return super(Style, self).setdefault(ik, default)
+
+    def update(self, other):
+        dic = dict(other)
+        dic = {self.attr2item_key(k): v for k, v in dic.items()}
+        for k, v in dic.items():
+            self.elm._style_set(k, v)
+        super(Style, self).update(dic)
+
+    def copy(self):
+        res = super(Style, self).copy()
+        return Style(self.elm, res)
 
     def clear(self):
         if 0 < len(self):

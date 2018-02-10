@@ -4,7 +4,7 @@ import unittest
 import json
 import sys
 
-from dominter.dom import Window, start_app
+from dominter.dom import Window, start_app, Style
 import dominter.dom as domdom
 
 
@@ -559,6 +559,124 @@ class TestDominter(unittest.TestCase):
         del s3.zIndex
         self.assertEqual(len(s3), 2)
         self.assertFalse(hasattr(s3, 'zIndex'))
+        # copy 1
+        s3bak = s3.copy()
+        self.assertEqual(s3bak, s3)
+        self.assertTrue(isinstance(s3bak, Style))
+        # pop
+        s3 = domdom.Style(elm, {
+            'aBc': 'abc1',
+            'd-ef': 'def2',
+            'GHI': 'ghi3',
+            'JKL': 'jkl4',
+            'mNo': 'mno5',
+            'p-qr': 'pqr6',
+            'STU': 'stu7',
+            'vWx': 'vwx8',
+        })
+        s3bb = s3.copy()
+        self.assertEqual(len(s3), 8)
+        ddcnt = len(document._diffdat)
+        x = s3.pop('aBc')
+        self.assertEqual(len(s3), 7)
+        self.assertEqual(x, 'abc1')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_deleteStyle'], ['a-bc', ])
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        x = s3.pop('d-ef')
+        self.assertEqual(len(s3), 6)
+        self.assertEqual(x, 'def2')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_deleteStyle'], ['d-ef', ])
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        x = s3.pop('xxx', 'yyy')
+        self.assertEqual(len(s3), 6)
+        self.assertEqual(x, 'yyy')
+        self.assertEqual(len(document._diffdat), ddcnt)
+        x = s3.pop('JKL')
+        self.assertEqual(len(s3), 5)
+        self.assertEqual(x, 'jkl4')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_deleteStyle'], ['jkl', ])
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        x = s3.pop('m-no')
+        self.assertEqual(len(s3), 4)
+        self.assertEqual(x, 'mno5')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_deleteStyle'], ['m-no', ])
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        x = s3.pop('pQr')
+        self.assertEqual(len(s3), 3)
+        self.assertEqual(x, 'pqr6')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_deleteStyle'], ['p-qr', ])
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        # popitem
+        x = s3.popitem()
+        self.assertEqual(len(s3), 2)
+        self.assertTrue(x[1] in ['ghi3', 'stu7', 'vwx8', ])
+        self.assertTrue(s3bb[x[0]], x[1])
+        self.assertFalse(x[0] in s3)
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_deleteStyle'], [x[0], ])
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        # setdefault
+        x = s3.setdefault('GHI', 'uuu')
+        self.assertEqual(x, 'ghi3')
+        self.assertEqual(len(s3), 2)
+        self.assertEqual(len(document._diffdat), ddcnt)
+        x = s3.setdefault('ggg', 'uuu')
+        self.assertEqual(x, 'uuu')
+        self.assertEqual(len(s3), 3)
+        self.assertEqual(s3['ggg'], 'uuu')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_setStyle'], {'ggg': 'uuu'})
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        # update
+        s3bb = s3.copy()
+        s3.update({'abCd': 'aa', 'ef-gh': 'bb'})
+        self.assertEqual(len(s3), 5)
+        self.assertTrue('abCd' in s3)
+        self.assertTrue('ab-cd' in s3)
+        self.assertEqual(s3['abCd'], 'aa')
+        self.assertEqual(s3['ab-cd'], 'aa')
+        self.assertTrue('ef-gh' in s3)
+        self.assertTrue('efGh' in s3)
+        self.assertEqual(s3['ef-gh'], 'bb')
+        self.assertEqual(s3['efGh'], 'bb')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_setStyle'], {'ab-cd': 'aa'})
+        ddcnt += 1
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_setStyle'], {'ef-gh': 'bb'})
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        s3.update([('ijKl', 'cc'), ('mn-op', 'dd')])
+        self.assertEqual(len(s3), 7)
+        self.assertTrue('ijKl' in s3)
+        self.assertTrue('ij-kl' in s3)
+        self.assertEqual(s3['ijKl'], 'cc')
+        self.assertEqual(s3['ij-kl'], 'cc')
+        self.assertTrue('mn-op' in s3)
+        self.assertTrue('mnOp' in s3)
+        self.assertEqual(s3['mn-op'], 'dd')
+        self.assertEqual(s3['mnOp'], 'dd')
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_setStyle'], {'ij-kl': 'cc'})
+        ddcnt += 1
+        ddd = document._diffdat[ddcnt]
+        self.assertEqual(ddd['_setStyle'], {'mn-op': 'dd'})
+        ddcnt += 1
+        self.assertEqual(len(document._diffdat), ddcnt)
+        # copy 2
+        s3 = s3bak.copy()
         # clear
         self.assertTrue(s3.cssText == 'color: blue; background-color: grey;' or
                         s3.cssText == 'background-color: grey; color: blue;')
