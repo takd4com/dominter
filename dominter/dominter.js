@@ -186,7 +186,8 @@
   var ws = new WebSocket(url);
 
   ws.onopen = function(ev) {
-    var dic = {'type': 'open', 'id': 'window', 'location': window.location};
+    var dic = {'type': 'open', 'id': 'window', 'location': window.location,
+      'localStorage': window.localStorage, 'sessionStorage': window.sessionStorage};
     var js = JSON.stringify(dic);
     ws.send(js);
   };
@@ -215,6 +216,27 @@
           var typ = lst[0];
           var fnc = lst[1];
           removeEventHandler(window, typ, fnc);
+        }
+        continue;
+      }
+      else if ((objid == '_sessionStorage') || (objid == '_localStorage')) {
+        var storage = (objid == '_sessionStorage') ? sessionStorage : localStorage;
+        if ('setitem' in dat) {
+          var kv = dat['setitem'];
+          storage.setItem(kv[0], kv[1]);
+        }
+        else if ('delitem' in dat) {
+          var key = dat['delitem'];
+          storage.removeItem(key);
+        }
+        else if ('update' in dat) {
+          var dic = dat['update'];
+          for (var key in dic) {
+            storage.setItem(key, dic[key]);
+          }
+        }
+        else if ('clear' in dat) {
+          storage.clear();
         }
         continue;
       }

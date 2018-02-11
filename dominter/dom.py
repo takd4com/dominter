@@ -12,6 +12,7 @@ import re
 import collections
 import threading
 import functools
+import collections
 from inspect import isclass
 from logging import (getLogger, basicConfig, DEBUG, INFO, WARN, ERROR)
 
@@ -309,7 +310,7 @@ class Style(dict):
         self.elm._style_delete(key)
         return res
 
-    def setdefault(self, key, default):
+    def setdefault(self, key, default=None):
         ik = self.attr2item_key(key)
         if ik not in self:
             super(Style, self).__setitem__(ik, default)
@@ -366,6 +367,128 @@ class Style(dict):
             res = self[key]
             self.__delitem__(key)
         return res
+
+
+class StorageBase(collections.OrderedDict):
+    def __init__(self, init_val=None,
+                 setitem_hook=None,
+                 delitem_hook=None,
+                 update_hook=None,
+                 clear_hook=None,
+                 # pop_hook=None,
+                 # popitem_hook=None,
+                 # setdefault_hook=None,
+                 name=None, ):
+        self.name = name
+        if init_val is None:
+            init_val = {}
+        super(StorageBase, self).__init__(init_val)
+        self.setitem_hook = setitem_hook
+        self.delitem_hook = delitem_hook
+        self.update_hook = update_hook
+        self.clear_hook = clear_hook
+        # self.pop_hook = pop_hook
+        # self.popitem_hook = popitem_hook
+        # self.setdefault_hook = setdefault_hook
+
+    def _raw_setitem(self, key, value):
+        return super(StorageBase, self).__setitem__(key, value)
+
+    def __setitem__(self, key, value):
+        if callable(self.setitem_hook):
+            if not self.setitem_hook(key, value, name=self.name):
+                return
+        super(StorageBase, self).__setitem__(key, value)
+
+    def _raw_delitem(self, key):
+        super(StorageBase, self).__delitem__(key)
+
+    def __delitem__(self, key):
+        if callable(self.delitem_hook):
+            if not self.delitem_hook(key, name=self.name):
+                return
+        super(StorageBase, self).__delitem__(key)
+
+    def _raw_pop(self, key, *args):
+        return super(StorageBase, self).pop(key, *args)
+
+    def pop(self, key, *args):
+        if key in self:
+            val = self[key]
+            self.__delitem__(key)
+            return val
+        else:
+            if 0 < len(args):
+                return args[0]
+            else:
+                raise TypeError
+
+    def _raw_popitem(self):
+        return super(StorageBase, self).popitem()
+
+    def popitem(self):
+        res = super(StorageBase, self).popitem()
+        key, value = res
+        self.__delitem__(key)
+        return res
+
+    def _raw_setdefault(self, key, default=None):
+        return super(StorageBase, self).setdefault(key, default)
+
+    def setdefault(self, key, default=None):
+        if key not in self:
+            super(StorageBase, self).__setitem__(key, default)
+            self.__setitem__(key, default)
+        return super(StorageBase, self).setdefault(key, default)
+
+    def _raw_update(self, other):
+        return super(StorageBase, self).update(other)
+
+    def update(self, other):
+        dic = dict(other)
+        for k, v in dic.items():
+            self.setitem_hook(k, v, name=self.name)
+        super(StorageBase, self).update(dic)
+
+    def _raw_clear(self):
+        return super(StorageBase, self).clear()
+
+    def clear(self):
+        if callable(self.clear_hook):
+            if not self.clear_hook(name=self.name):
+                return
+        if 0 < len(self):
+            super(StorageBase, self).clear()
+
+    @property
+    def length(self):
+        return len(self)
+
+    def key(self, index):
+        try:
+            return list(self.keys())[index]
+        except IndexError:
+            return None
+
+    def getItem(self, key):
+        return self.get(key)
+
+    def setItem(self, key, value):
+        self[key] = value
+
+    def removeItem(self, key):
+        self.pop(key, None)
+
+
+class WinStorage(StorageBase):
+    def __init__(self, window, init_val=None, name=None):
+        super(WinStorage, self).__init__(init_val=init_val,
+                                         name=name,
+                                         setitem_hook=window._storage_setitem,
+                                         delitem_hook=window._storage_delitem,
+                                         update_hook=window._storage_update,
+                                         clear_hook=window._storage_clear,
+                                         )
 
 
 class ThreadSafe(object):
@@ -1533,6 +1656,8 @@ class Window(object):
         #self.name = ''
         self._socks = []
         self.location = None
+        self.localStorage = WinStorage(window=self, name='localStorage')
+        self.sessionStorage = WinStorage(window=self, name='sessionStorage')
 
     def add_sock(self, sock):
         self._socks.append(sock)
@@ -1621,6 +1746,22 @@ class Window(object):
     # def onload(self, ev): # called when uesr defined
     #    logger.debug('default onload. location:{}'.format(self.location))
 
+    def _storage_setitem(self, key, value, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'setitem': [key, value, ]})
+        return True
+
+    def _storage_delitem(self, key, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'delitem': key})
+        return True
+
+    def _storage_update(self, other, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'update': other})
+        return True
+
+    def _storage_clear(self, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'clear': True})
+        return True
+
 
 class GetHandler(tornado.web.RequestHandler):
     """
@@ -1702,6 +1843,8 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         # system handler
         if 'open' == type_:
             win.location = dic.get('location')
+            win.localStorage._raw_update(dic.get('localStorage'))
+            win.sessionStorage._raw_update(dic.get('sessionStorage'))
             if hasattr(win, 'onload'):
                 win.onload(None)
                 self.sync()
@@ -1891,7 +2034,3 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
                                         io_loop=ioloop).start()
     ioloop.add_callback(ThreadSafe.set_tornado_thread_id)
     ioloop.start()
-
-
-def version():
-    return '0.2.0pre'
