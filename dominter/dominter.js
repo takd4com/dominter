@@ -185,9 +185,21 @@
     location.host + wspath;
   var ws = new WebSocket(url);
 
+  var parseStorage = function(dic) {
+    // storage is dict, key is string, value is JSON.stringified.
+    var res = {};
+    var keys = Object.keys(dic);
+    for (var key of keys) {
+      res[key] = JSON.parse(dic[key]);
+    }
+    return res;
+  }
+
   ws.onopen = function(ev) {
+    var localst = parseStorage(window.localStorage);
+    var sessionst = parseStorage(window.sessionStorage);
     var dic = {'type': 'open', 'id': 'window', 'location': window.location,
-      'localStorage': window.localStorage, 'sessionStorage': window.sessionStorage};
+      'localStorage': localst, 'sessionStorage': sessionst};
     var js = JSON.stringify(dic);
     ws.send(js);
   };
@@ -223,7 +235,7 @@
         var storage = (objid == '_sessionStorage') ? sessionStorage : localStorage;
         if ('setitem' in dat) {
           var kv = dat['setitem'];
-          storage.setItem(kv[0], kv[1]);
+          storage.setItem(kv[0], JSON.stringify(kv[1]));
         }
         else if ('delitem' in dat) {
           var key = dat['delitem'];
