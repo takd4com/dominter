@@ -203,7 +203,7 @@
   if (!wspath) {
     return;
   }
-  var url = (location.protocol == 'https:' ? 'wss' : 'ws:') +
+  var url = (location.protocol == 'https:' ? 'wss:' : 'ws:') +
     location.host + wspath;
   var ws = new WebSocket(url);
 
