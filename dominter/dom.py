@@ -1826,10 +1826,15 @@ class WsHandler(tornado.websocket.WebSocketHandler):
             self.clients[wins] = []
         if self not in self.clients[wins]:
             self.clients[wins].append(self)
+        # self.send_whole_data() # sometimes not sent
+
+    def send_whole_data(self):
         if self.window is not None:
             dat = self.window._dumps()
-            logger.debug('thread:{} self:{} send window dat(len={})'.format(threading.current_thread().ident, self, len(dat)))
+            logger.debug('thread:{} self:{} send window dat(len={})'.format(
+                threading.current_thread().ident, self, len(dat)))
             self.write_message(dat)
+            # tornado.ioloop.IOLoop.current().call_later(0.01, self.write_message, dat)
         else:
             logger.warn('thread:{} self:{} no window dat'.format(threading.current_thread().ident, self))
 
@@ -1842,6 +1847,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         # logger.debug("thread:{} self:{} id: {} type:{}".format(threading.current_thread().ident, self, id_, type_))
         # system handler
         if 'open' == type_:
+            self.send_whole_data()
             win.location = dic.get('location')
             win.localStorage._raw_update(dic.get('localStorage'))
             win.sessionStorage._raw_update(dic.get('sessionStorage'))
@@ -1890,7 +1896,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         if doc._dirty_diff:
             # self.write_message({'diff': doc._diffdat})
             logger.debug('broadcast diff: {}'.format(len(doc._diffdat)))
-            self.broadcast({'diff': doc._diffdat})
+            self.broadcast(json.dumps({'diff': doc._diffdat}))
             doc._clean_diff()
 
     def broadcast(self, msg):

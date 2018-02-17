@@ -3,6 +3,28 @@
 "use strict";
 
 (function() {
+  // logger
+  var logger = {};
+  logger.DEBUG = 1;
+  logger.INFO = 2;
+  logger.logLevel = logger.DEBUG;
+  //logger.logLevel = logger.INFO;
+  logger.log = function(level, disp, fnc, msg) {
+    if (level < logger.logLevel) {
+      return;
+    }
+    var date = new Date();
+    var ms = date.getMilliseconds();
+    fnc(date.toLocaleString() + ',' + ms + ' ' + disp + ' ' + msg);
+  }
+  logger.debug = function(msg) {
+    logger.log(logger.DEBUG, 'DEBUG', console.debug, msg);
+  }
+  logger.info = function(msg) {
+    logger.log(logger.INFO, 'INFO', console.info, msg);
+  }
+
+  // dominter
   var excepts = ['_in_init_', 'tagName', 'document', 'parent',
     '_id', '_objid_', '_classList', '_eventlisteners',
     '_childList', '_onclick', 'onclick', '_onchange', 'onchange',
@@ -196,6 +218,7 @@
   }
 
   ws.onopen = function(ev) {
+    logger.info('onopen');
     var localst = parseStorage(window.localStorage);
     var sessionst = parseStorage(window.sessionStorage);
     var dic = {'type': 'open', 'id': 'window', 'location': window.location,
@@ -467,6 +490,7 @@
   };
 
   ws.onmessage = function(ev) {
+    logger.debug('onmessage: len=' + ev.data.length)
     var dic = JSON.parse(ev.data);
     if ('head' in dic) {
       var head = dic['head'];
@@ -474,6 +498,7 @@
         appendElements(ws, document.head, head['_childList']);
       }
       headId = head._id;
+      logger.debug('rcv head')
     }
     if ('body' in dic) {
       var body = dic['body'];
@@ -481,16 +506,20 @@
         appendElements(ws, document.body, body['_childList']);
       }
       bodyId = body._id;
+      logger.debug('rcv body')
     }
     if ('_window_element' in dic) {
       var dat = dic['_window_element'];
       newWindow(ws, dat);
+      logger.debug('rcv _window_element')
     }
     if ('diff' in dic) {
       diffproc(ws, dic, 'diff');
+      logger.debug('rcv diff')
     }
     if ('type' in dic) {
       typeproc(ws, dic);
+      logger.debug('rcv type')
     }
   };
 })();
