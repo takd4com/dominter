@@ -3,6 +3,28 @@
 "use strict";
 
 (function() {
+  // logger
+  var logger = {};
+  logger.DEBUG = 1;
+  logger.INFO = 2;
+  logger.logLevel = logger.DEBUG;
+  //logger.logLevel = logger.INFO;
+  logger.log = function(level, disp, fnc, msg) {
+    if (level < logger.logLevel) {
+      return;
+    }
+    var date = new Date();
+    var ms = date.getMilliseconds();
+    fnc(date.toLocaleString() + ',' + ms + ' ' + disp + ' ' + msg);
+  }
+  logger.debug = function(msg) {
+    logger.log(logger.DEBUG, 'DEBUG', console.debug, msg);
+  }
+  logger.info = function(msg) {
+    logger.log(logger.INFO, 'INFO', console.info, msg);
+  }
+
+  // dominter
   var excepts = ['_in_init_', 'tagName', 'document', 'parent',
     '_id', '_objid_', '_classList', '_eventlisteners',
     '_childList', '_onclick', 'onclick', '_onchange', 'onchange',
@@ -47,6 +69,11 @@
         if (ev.target.selectedIndex !== undefined) {
           dic['selectedIndex'] = ev.target.selectedIndex;
         }
+      }
+      else if (('keypress' == type_)||
+                ('keyup' == type_)||
+                ('keydown' == type_)) {
+        dic['value'] = ev.target.value;
       }
       var js = JSON.stringify(dic);
       ws.send(js);
@@ -126,6 +153,23 @@
     return elm;
   };
 
+  var newWindow = function(ws, dat) {
+    var elm = window;
+    for (var pr in dat) {
+      if (0 > excepts.indexOf(pr)) {
+        elm[pr] = dat[pr];
+      }
+    }
+    var val = dat['_eventlisteners']
+    if (val) {
+      for (var tpl of val) {
+        var typ = tpl[0];
+        var fnc = tpl[1];
+        elm.addEventListener(typ, createEventHandler(ws, typ, fnc), false);
+      }
+    }
+  }
+
   var appendElements = function(ws, parent, lst) {
     for (var dat of lst) {
       var tagname = dat['tagName'];
@@ -163,7 +207,24 @@
     location.host + wspath;
   var ws = new WebSocket(url);
 
+  var parseStorage = function(dic) {
+    // storage is dict, key is string, value is JSON.stringified.
+    var res = {};
+    var keys = Object.keys(dic);
+    for (var key of keys) {
+      res[key] = JSON.parse(dic[key]);
+    }
+    return res;
+  }
+
   ws.onopen = function(ev) {
+    logger.info('onopen');
+    var localst = parseStorage(window.localStorage);
+    var sessionst = parseStorage(window.sessionStorage);
+    var dic = {'type': 'open', 'id': 'window', 'location': window.location,
+      'localStorage': localst, 'sessionStorage': sessionst};
+    var js = JSON.stringify(dic);
+    ws.send(js);
   };
 
   var findElm = function(dic, eid) {
@@ -178,6 +239,42 @@
     var newdic = {};
     for (var dat of dic[name]) {
       var objid = dat['_objid_'];
+      if (objid == '_window_handler') {
+        if ('_addEventListener' in dat) {
+          var lst = dat['_addEventListener'];
+          var typ = lst[0];
+          var fnc = lst[1];
+          window.addEventListener(typ, createEventHandler(ws, typ, fnc), false);
+        }
+        if ('_removeEventListener' in dat) {
+          var lst = dat['_removeEventListener'];
+          var typ = lst[0];
+          var fnc = lst[1];
+          removeEventHandler(window, typ, fnc);
+        }
+        continue;
+      }
+      else if ((objid == '_sessionStorage') || (objid == '_localStorage')) {
+        var storage = (objid == '_sessionStorage') ? sessionStorage : localStorage;
+        if ('setitem' in dat) {
+          var kv = dat['setitem'];
+          storage.setItem(kv[0], JSON.stringify(kv[1]));
+        }
+        else if ('delitem' in dat) {
+          var key = dat['delitem'];
+          storage.removeItem(key);
+        }
+        else if ('update' in dat) {
+          var dic = dat['update'];
+          for (var key in dic) {
+            storage.setItem(key, dic[key]);
+          }
+        }
+        else if ('clear' in dat) {
+          storage.clear();
+        }
+        continue;
+      }
       var elm = document.getElementById(objid);
       if (!elm) {
         if (objid == headId) {
@@ -346,10 +443,16 @@
           elm.addEventListener(typ, createEventHandler(ws, typ, fnc), false);
         }
         if ('_removeEventListener' in dat) {
-          var lst = dat['_addEventListener'];
+          var lst = dat['_removeEventListener'];
           var typ = lst[0];
           var fnc = lst[1];
           removeEventHandler(elm, typ, fnc);
+        }
+        if ('_focus' in dat) {
+          elm.focus();
+        }
+        if ('_blur' in dat) {
+          elm.blur();
         }
       }
       if ('_createElement' in dat) {
@@ -387,6 +490,7 @@
   };
 
   ws.onmessage = function(ev) {
+    logger.debug('onmessage: len=' + ev.data.length)
     var dic = JSON.parse(ev.data);
     if ('head' in dic) {
       var head = dic['head'];
@@ -394,6 +498,7 @@
         appendElements(ws, document.head, head['_childList']);
       }
       headId = head._id;
+      logger.debug('rcv head')
     }
     if ('body' in dic) {
       var body = dic['body'];
@@ -401,12 +506,20 @@
         appendElements(ws, document.body, body['_childList']);
       }
       bodyId = body._id;
+      logger.debug('rcv body')
+    }
+    if ('_window_element' in dic) {
+      var dat = dic['_window_element'];
+      newWindow(ws, dat);
+      logger.debug('rcv _window_element')
     }
     if ('diff' in dic) {
       diffproc(ws, dic, 'diff');
+      logger.debug('rcv diff')
     }
     if ('type' in dic) {
       typeproc(ws, dic);
+      logger.debug('rcv type')
     }
   };
 })();

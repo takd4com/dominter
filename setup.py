@@ -3,9 +3,12 @@
 from setuptools import setup
 import io
 
+import dominter
+
+
 setup(
     name='dominter',
-    version='0.1.0',
+    version=dominter.version,
     description='A simple GUI package for small asynchronous web application',
     long_description=io.open('README.rst', encoding='utf-8').read(),
     author='Tamini Bean',

@@ -10,6 +10,9 @@ import json
 import shlex
 import re
 import collections
+import threading
+import functools
+import collections
 from inspect import isclass
 from logging import (getLogger, basicConfig, DEBUG, INFO, WARN, ERROR)
 
@@ -19,7 +22,6 @@ import tornado.websocket
 
 
 logger = getLogger(__name__)
-
 _OBJKEY_ = '_objid_'
 
 
@@ -291,15 +293,40 @@ class Style(dict):
         self.__delitem__(key)
 
     def pop(self, key, *args):
-        if key in self:
-            val = self[key]
-            self.__delitem__(key)
+        ik = self.attr2item_key(key)
+        if ik in self:
+            val = self[ik]
+            self.__delitem__(ik)
             return val
         else:
             if 0 < len(args):
                 return args[0]
             else:
                 raise TypeError
+
+    def popitem(self):
+        res = super(Style, self).popitem()
+        key, value = res
+        self.elm._style_delete(key)
+        return res
+
+    def setdefault(self, key, default=None):
+        ik = self.attr2item_key(key)
+        if ik not in self:
+            super(Style, self).__setitem__(ik, default)
+            self.elm._style_set(ik, default)
+        return super(Style, self).setdefault(ik, default)
+
+    def update(self, other):
+        dic = dict(other)
+        dic = {self.attr2item_key(k): v for k, v in dic.items()}
+        for k, v in dic.items():
+            self.elm._style_set(k, v)
+        super(Style, self).update(dic)
+
+    def copy(self):
+        res = super(Style, self).copy()
+        return Style(self.elm, res)
 
     def clear(self):
         if 0 < len(self):
@@ -340,6 +367,171 @@ class Style(dict):
             res = self[key]
             self.__delitem__(key)
         return res
+
+
+class StorageBase(collections.OrderedDict):
+    def __init__(self, init_val=None,
+                 setitem_hook=None,
+                 delitem_hook=None,
+                 update_hook=None,
+                 clear_hook=None,
+                 # pop_hook=None,
+                 # popitem_hook=None,
+                 # setdefault_hook=None,
+                 name=None, ):
+        self.name = name
+        if init_val is None:
+            init_val = {}
+        super(StorageBase, self).__init__(init_val)
+        self.setitem_hook = setitem_hook
+        self.delitem_hook = delitem_hook
+        self.update_hook = update_hook
+        self.clear_hook = clear_hook
+        # self.pop_hook = pop_hook
+        # self.popitem_hook = popitem_hook
+        # self.setdefault_hook = setdefault_hook
+
+    def _raw_setitem(self, key, value):
+        return super(StorageBase, self).__setitem__(key, value)
+
+    def __setitem__(self, key, value):
+        if callable(self.setitem_hook):
+            if not self.setitem_hook(key, value, name=self.name):
+                return
+        super(StorageBase, self).__setitem__(key, value)
+
+    def _raw_delitem(self, key):
+        super(StorageBase, self).__delitem__(key)
+
+    def __delitem__(self, key):
+        if callable(self.delitem_hook):
+            if not self.delitem_hook(key, name=self.name):
+                return
+        super(StorageBase, self).__delitem__(key)
+
+    def _raw_pop(self, key, *args):
+        return super(StorageBase, self).pop(key, *args)
+
+    def pop(self, key, *args):
+        if key in self:
+            val = self[key]
+            self.__delitem__(key)
+            return val
+        else:
+            if 0 < len(args):
+                return args[0]
+            else:
+                raise TypeError
+
+    def _raw_popitem(self):
+        return super(StorageBase, self).popitem()
+
+    def popitem(self):
+        res = super(StorageBase, self).popitem()
+        key, value = res
+        self.__delitem__(key)
+        return res
+
+    def _raw_setdefault(self, key, default=None):
+        return super(StorageBase, self).setdefault(key, default)
+
+    def setdefault(self, key, default=None):
+        if key not in self:
+            super(StorageBase, self).__setitem__(key, default)
+            self.__setitem__(key, default)
+        return super(StorageBase, self).setdefault(key, default)
+
+    def _raw_update(self, other):
+        return super(StorageBase, self).update(other)
+
+    def update(self, other):
+        dic = dict(other)
+        for k, v in dic.items():
+            self.setitem_hook(k, v, name=self.name)
+        super(StorageBase, self).update(dic)
+
+    def _raw_clear(self):
+        return super(StorageBase, self).clear()
+
+    def clear(self):
+        if callable(self.clear_hook):
+            if not self.clear_hook(name=self.name):
+                return
+        if 0 < len(self):
+            super(StorageBase, self).clear()
+
+    @property
+    def length(self):
+        return len(self)
+
+    def key(self, index):
+        try:
+            return list(self.keys())[index]
+        except IndexError:
+            return None
+
+    def getItem(self, key):
+        return self.get(key)
+
+    def setItem(self, key, value):
+        self[key] = value
+
+    def removeItem(self, key):
+        self.pop(key, None)
+
+
+class WinStorage(StorageBase):
+    def __init__(self, window, init_val=None, name=None):
+        super(WinStorage, self).__init__(init_val=init_val,
+                                         name=name,
+                                         setitem_hook=window._storage_setitem,
+                                         delitem_hook=window._storage_delitem,
+                                         update_hook=window._storage_update,
+                                         clear_hook=window._storage_clear,
+                                         )
+
+
+class ThreadSafe(object):
+    _disabled = False
+    _tornado_thread_id = None
+
+    @classmethod
+    def set_tornado_thread_id(cls):
+        # must call from tornado thread
+        cls._tornado_thread_id = threading.current_thread().ident
+
+    @classmethod
+    def invoke_required(cls):
+        if cls._disabled:
+            return False
+        elif cls._tornado_thread_id is None:
+            return False
+        elif cls._tornado_thread_id == threading.current_thread().ident:
+            return False
+        else:
+            return True
+
+    @classmethod
+    def enable(cls):
+        cls._disabled = False
+
+    @classmethod
+    def disable(cls):
+        cls._disabled = True
+
+
+# decorator PENDING
+def element_thread_safe(fnc):
+    @functools.wraps(fnc)
+    def wrap(self, *args, **kwargs):
+        if (not ThreadSafe.invoke_required() or
+                not hasattr(self, '_in_init_') or
+                self._in_init_):
+            return fnc(self, *args, **kwargs)
+        else:
+            self.document.window.invoke(fnc, self, *args, **kwargs)
+    return wrap
+
 
 class Element(object):
     """
@@ -401,7 +593,9 @@ class Element(object):
             if (not self._in_init_) and (key not in self.dif_excepts):
                 self.document._add_diff({_OBJKEY_: self._id, key: value})
 
+    # @element_thread_safe # PENDING
     def __setattr__(self, key, value):
+        # logger.debug('thread:{} key:{} value:{}'.format(threading.current_thread().ident, key, value))
         self._pre_setattr(key, value)
         super(Element, self).__setattr__(key, value)
 
@@ -438,6 +632,9 @@ class Element(object):
 
     @childList.setter
     def childList(self, lst):
+        self._set_child_list(lst)
+
+    def _set_child_list(self, lst):
         if 0 < len(self._childList):
             self._childList.clear()
         for elm in lst:
@@ -469,6 +666,9 @@ class Element(object):
 
     @style.setter
     def style(self, value):
+        self._set_style(value)
+
+    def _set_style(self, value):
         self._style.cssText = value
 
     def _addhandler(self, fnc):
@@ -572,7 +772,8 @@ class Element(object):
     def setAttribute(self, name, value):
         if 'style' == name:
             # self._style.set_text(value)
-            self.style.cssText = value
+            # self.style.cssText = value
+            self._set_style(value)
         elif 'class' == name:
             self.className = value
         else:
@@ -600,6 +801,12 @@ class Element(object):
             name = repr(listener)
             self.document._add_diff({_OBJKEY_: self._id, '_removeEventListener': [type_, name, ]})
             del(self.document._handlers[name])
+
+    def focus(self):
+        self.document._add_diff({_OBJKEY_: self._id, '_focus': True})
+
+    def blur(self):
+        self.document._add_diff({_OBJKEY_: self._id, '_blur': True})
 
     def _dumps(self):
         # self.onload()
@@ -813,7 +1020,7 @@ class Document(object):
     """
     virtual document class
     """
-    def __init__(self):
+    def __init__(self, window):
         self._dirty_diff = False
         self._dirty_cache = True
         self._obj_dic = {}
@@ -821,6 +1028,8 @@ class Document(object):
         self._handlers = {}
         self.head = Element(self, 'head')
         self.body = Element(self, 'body')
+        self.window = window
+        self._window_element = Element(self, '_window_element')
         self._cache = None
 
     def _clean_diff(self):
@@ -1427,14 +1636,35 @@ class Document(object):
                                 childList=childList)
 
 
+# decorator PENDING
+def window_thread_safe(fnc):
+    @functools.wraps(fnc)
+    def wrap(self, *args, **kwargs):
+        if ThreadSafe.invoke_required():
+            self.invoke(fnc, self, *args, **kwargs)
+        else:
+            return fnc(self, *args, **kwargs)
+    return wrap
+
+
 class Window(object):
     """
     virtual window class
     """
     def __init__(self):
-        self.document = Document()
-        #self.location = ''
+        self.document = Document(self)
         #self.name = ''
+        self._socks = []
+        self.location = None
+        self.localStorage = WinStorage(window=self, name='localStorage')
+        self.sessionStorage = WinStorage(window=self, name='sessionStorage')
+
+    def add_sock(self, sock):
+        self._socks.append(sock)
+
+    def remove_sock(self, sock):
+        if sock in self._socks:
+            self._socks.remove(sock)
 
     def _dumps(self):
         if self.document._dirty_cache:
@@ -1449,13 +1679,88 @@ class Window(object):
     @staticmethod
     def _serializer(obj):
         if isinstance(obj, Document):
-            return {'head': obj.head, 'body': obj.body}
+            return {'head': obj.head, 'body': obj.body,
+                    '_window_element': obj._window_element, }
         if isinstance(obj, Element):
             return Element._serializer(obj)
         if callable(obj):
             name = repr(obj)
             return name
         raise TypeError(repr(obj) + " is not serializable!")
+
+    def sync(self):
+        if 0 < len(self._socks):
+            self._socks[0].sync()
+
+    def invoke(self, fnc, *args, **kwargs):
+        # invoke fnc   * thread safe
+        logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
+
+        def f():
+            fnc(*args, **kwargs)
+            self.sync()
+        tornado.ioloop.IOLoop.current().add_callback(f)
+        return True
+
+    def set_timeout(self, fnc, delay, *args, **kwargs):
+        logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
+
+        def f():
+            fnc(*args, **kwargs)
+            self.sync()
+        # self._timeout_id += 1
+        hdl = tornado.ioloop.IOLoop.current().call_later(delay, f)
+        # self._timeout_dic[self._timeout_id] = hdl
+        # return self._timeout_id
+        return hdl
+
+    # @window_thread_safe # PENDING
+    def remove_timeout(self, hdl):
+        # hdl = self._timeout_dic.get(timeout_id)
+        if hdl is None:
+            logger.error('unknown timer_id')
+            return False
+        else:
+            tornado.ioloop.IOLoop.current().remove_timeout(hdl)
+            return True
+
+    @staticmethod
+    def invoke_required():
+        return ThreadSafe.invoke_required()
+
+    def addEventListener(self, type_, listener):
+        elm = self.document._window_element
+        elm._eventlisteners.append((type_, listener))
+        name = elm._addhandler(listener)
+        self.document._add_diff({_OBJKEY_: '_window_handler', '_addEventListener': [type_, name, ]})
+
+    def removeEventListener(self, type_, listener):
+        elm = self.document._window_element
+        tpl = (type_, listener)
+        if tpl in elm._eventlisteners:
+            elm._eventlisteners.remove(tpl)
+            name = repr(listener)
+            self.document._add_diff({_OBJKEY_: '_window_handler', '_removeEventListener': [type_, name, ]})
+            del(self.document._handlers[name])
+
+    # def onload(self, ev): # called when uesr defined
+    #    logger.debug('default onload. location:{}'.format(self.location))
+
+    def _storage_setitem(self, key, value, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'setitem': [key, value, ]})
+        return True
+
+    def _storage_delitem(self, key, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'delitem': key})
+        return True
+
+    def _storage_update(self, other, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'update': other})
+        return True
+
+    def _storage_clear(self, name=''):
+        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'clear': True})
+        return True
 
 
 class GetHandler(tornado.web.RequestHandler):
@@ -1504,42 +1809,64 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         as multiple instance. if instance is given, it acts as single instance.
         :return: None
         """
+        # logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
         self.ismulti = False
         if isclass(window):
             self.ismulti = True
             self.window = window()
         else:
             self.window = window
+        self.window.add_sock(self)
 
     def open(self):
-        logger.debug('open connection: {}'.format(self))
+        # logger.debug('open connection: {}'.format(self))
+        logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
         wins = str(self.window)
         if wins not in self.clients:
             self.clients[wins] = []
         if self not in self.clients[wins]:
             self.clients[wins].append(self)
+        # self.send_whole_data() # sometimes not sent
+
+    def send_whole_data(self):
         if self.window is not None:
             dat = self.window._dumps()
+            logger.debug('thread:{} self:{} send window dat(len={})'.format(
+                threading.current_thread().ident, self, len(dat)))
             self.write_message(dat)
+            # tornado.ioloop.IOLoop.current().call_later(0.01, self.write_message, dat)
+        else:
+            logger.warn('thread:{} self:{} no window dat'.format(threading.current_thread().ident, self))
 
     def on_message(self, msg):
         dic = json.loads(msg)
         type_ = dic['type']
         id_ = dic['id']
         logger.debug('id: {} type:{}'.format(id_, type_))
+        win = self.window
+        # logger.debug("thread:{} self:{} id: {} type:{}".format(threading.current_thread().ident, self, id_, type_))
         # system handler
+        if 'open' == type_:
+            self.send_whole_data()
+            win.location = dic.get('location')
+            win.localStorage._raw_update(dic.get('localStorage'))
+            win.sessionStorage._raw_update(dic.get('sessionStorage'))
+            if hasattr(win, 'onload'):
+                win.onload(None)
+                self.sync()
+            return
         if 'change' == type_:
-            objdic = self.window.document._obj_dic
+            objdic = win.document._obj_dic
             if id_ in objdic:
                 obj = objdic[id_]
                 if 'value' in dic:
                     obj.value = dic['value']
+                    # print('set by {} {}.value={}'.format(type_, id_, obj.value))
                 if 'selectedIndex' in dic:
                     obj.selectedIndex = dic['selectedIndex']
                 if 'checked' in dic:
                     obj.checked = dic['checked']
                     if obj.type == 'radio' and obj.checked:
-                        # radiobuttonのcheckedは自分ではずさないといけない
                         group = self.window.document.getElementsByName(obj.name)
                         if group is not None:
                             for elm in group:
@@ -1548,19 +1875,29 @@ class WsHandler(tornado.websocket.WebSocketHandler):
                 # boradcast if single instance
                 self.broadcast(msg)
         # user handler
-        if self.window is not None:
-            doc = self.window.document
-            if id_ in self.window.document._handlers:
-                fnc = self.window.document._handlers[id_]
+        if win is not None:
+            doc = win.document
+            if id_ in doc._handlers:
+                fnc = doc._handlers[id_]
                 if callable(fnc):
+                    if ('keypress' == type_ or
+                       'keyup' == type_ or 'keydown' == type_):
+                        tid = dic['targetId']
+                        target = doc.getElementById(tid)
+                        target.value = dic['value']
+                        # print('set by {} {}.value={}'.format(type_, tid, target.value))
                     doc._clean_diff()
                     fnc(dic)
-                    #del#if 0 < len(doc._diffdat):
-                    if doc._dirty_diff:
-                        # self.write_message({'diff': doc._diffdat})
-                        logger.debug('broadcast diff: {}'.format(len(doc._diffdat)))
-                        self.broadcast({'diff': doc._diffdat})
-                        doc._clean_diff()
+                    self.sync()
+
+    def sync(self):
+        doc = self.window.document
+        # del#if 0 < len(doc._diffdat):
+        if doc._dirty_diff:
+            # self.write_message({'diff': doc._diffdat})
+            logger.debug('broadcast diff: {}'.format(len(doc._diffdat)))
+            self.broadcast(json.dumps({'diff': doc._diffdat}))
+            doc._clean_diff()
 
     def broadcast(self, msg):
         cnt = 0
@@ -1577,6 +1914,8 @@ class WsHandler(tornado.websocket.WebSocketHandler):
 
     def on_close(self):
         logger.debug('close connection: {}'.format(self))
+        # logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
+        self.window.remove_sock(self)
         wins = str(self.window)
         if self in self.clients[wins]:
             self.clients[wins].remove(self)
@@ -1685,7 +2024,7 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
                                       static_path=static_path)
 
     def periodic():
-        # print('periodic!')
+        # logger.debug("thread:{}".format(threading.current_thread().ident))
         for win in winlst:
             if not isclass(win):
                 # create cache if single instance
@@ -1699,8 +2038,5 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
         # background worker to create cache
         tornado.ioloop.PeriodicCallback(periodic, background_msec,
                                         io_loop=ioloop).start()
+    ioloop.add_callback(ThreadSafe.set_tornado_thread_id)
     ioloop.start()
-
-
-def version():
-    return '0.1.0'

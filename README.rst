@@ -6,10 +6,14 @@ Features
 --------
 * JavaScript style API and other types of API that can be written shorter.
 * Any tags and attributes can be used.
-* Supports 'click', 'change' and any events.
+* Supports onclick(), onchange() and addEventListener().
 * Supports multiple window.
 * Supports both multiple-instance and single-instance.
 * Supports Element.className and Element.style properties.
+* Supports Window.addEventListener() for events such as 'hashchange'.
+* Supports localStorage and sessionStorage.
+* Supports fake Window.onload() to inform localStorage, sessionStorage and location has been set.
+* Supports invoke() to operate from other threads.
 * Depends only on `Tornado <http://www.tornadoweb.org>`_.
 
 Installation
@@ -26,7 +30,7 @@ Example
 
 .. code-block:: python
 
-    from dominter.dom import Window, start_app
+    from dominter import Window, start_app
 
     class MyWindow(Window):
         def __init__(self):
@@ -50,7 +54,7 @@ Example
 
 .. code-block:: python
 
-    from dominter.dom import Window, start_app
+    from dominter import Window, start_app
 
     win = Window()
     document = win.document
@@ -71,7 +75,7 @@ Example
 
 .. code-block:: python
 
-    from dominter.dom import Window, start_app
+    from dominter import Window, start_app
 
     win = Window()
     document = win.document
@@ -99,7 +103,7 @@ h1, h2, h3, h4, h5, h6, ol, li, ul, section, header, footer
 
 .. code-block:: python
 
-    dominter.dom import Window, start_app
+    from dominter import Window, start_app
 
     class MyWindow1(Window):
         def __init__(self):
@@ -132,7 +136,7 @@ h1, h2, h3, h4, h5, h6, ol, li, ul, section, header, footer
 
 .. code-block:: python
 
-    from dominter.dom import Window, start_app
+    from dominter import Window, start_app
 
     class MyWindow1(Window):
         def __init__(self):
