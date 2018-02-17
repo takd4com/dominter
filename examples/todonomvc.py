@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # dominter todo NO MVC example
 # This is a poor copy of http://todomvc.com/examples.
+import argparse
 from logging import (getLogger, StreamHandler, basicConfig,
                       DEBUG, INFO, WARN, ERROR)
 
@@ -306,14 +307,23 @@ class MyWindow(Window):
                 self.store_del(sid)
 
 
+def get_arg_port():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--port', default=8888)
+    args = ap.parse_args()
+    port = args.port
+    return port
+
+
 def main():
+    port = get_arg_port()
     win = MyWindow()
-    start_app(win)
+    start_app(win, port=port)
 
 
 if __name__ == "__main__":
     basicConfig(format='%(asctime)-15s %(levelname)s %(module)s.%(funcName)s %(message)s')
     logger = getLogger()  # root logger
-    logger.setLevel(DEBUG)
-    # logger.setLevel(INFO)
+    # logger.setLevel(DEBUG)
+    logger.setLevel(INFO)
     main()
