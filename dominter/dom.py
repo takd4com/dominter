@@ -1996,6 +1996,7 @@ def make_app(wins, js_path="/dominter.js", ws_path_pre='/_ws',
 def start_app(wins, port=8888, template_path=None, static_path=None,
               js_path="/dominter.js", ws_path_pre='/_ws',
               html_pre='/index', html_post='.html', background_msec=2000,
+              websocket_ping_interval=20,
               silent=False):
     """
     start tornado app for dominter
@@ -2010,6 +2011,7 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
     :param html_post: html path suffix. default='.html'
     :param background_msec: background worker act period for single-instance
      in milli seconds.
+    :param websocket_ping_interval: websocket ping interval
     :param silent: suppress start message
     :return: None
     """
@@ -2017,9 +2019,11 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
                               html_pre=html_pre, html_post=html_post,
                               silent=silent)
     if template_path is None:
-        app = tornado.web.Application(applst)
+        app = tornado.web.Application(applst,
+                                      websocket_ping_interval=websocket_ping_interval)
     else:
         app = tornado.web.Application(applst,
+                                      websocket_ping_interval=websocket_ping_interval,
                                       template_path=template_path,
                                       static_path=static_path)
 
