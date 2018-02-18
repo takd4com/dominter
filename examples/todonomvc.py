@@ -317,8 +317,7 @@ def get_arg_port():
 
 def main():
     port = get_arg_port()
-    win = MyWindow()
-    start_app(win, port=port)
+    start_app(MyWindow, port=port)
 
 
 if __name__ == "__main__":
