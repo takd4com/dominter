@@ -170,7 +170,8 @@
     }
   }
 
-  var appendElements = function(ws, parent, lst) {
+  var appendElements = function(ws, parent, lst, istop=true) {
+    var tgt = istop ? document.createDocumentFragment() : parent;
     for (var dat of lst) {
       var tagname = dat['tagName'];
       var isnew = true;
@@ -186,11 +187,14 @@
         elm = newElement(ws, dat)
       }
       if (dat._childList) {
-        appendElements(ws, elm, dat._childList);
+        appendElements(ws, elm, dat._childList, false);
       }
       if (isnew) {
-        parent.appendChild(elm);
+        tgt.appendChild(elm);
       }
+    }
+    if (istop) {
+      parent.appendChild(tgt);
     }
   };
 
@@ -203,9 +207,6 @@
   if (!wspath) {
     return;
   }
-  var url = (location.protocol == 'https:' ? 'wss:' : 'ws:') +
-    location.host + wspath;
-  var ws = new WebSocket(url);
 
   var parseStorage = function(dic) {
     // storage is dict, key is string, value is JSON.stringified.
@@ -216,16 +217,6 @@
     }
     return res;
   }
-
-  ws.onopen = function(ev) {
-    logger.info('onopen');
-    var localst = parseStorage(window.localStorage);
-    var sessionst = parseStorage(window.sessionStorage);
-    var dic = {'type': 'open', 'id': 'window', 'location': window.location,
-      'localStorage': localst, 'sessionStorage': sessionst};
-    var js = JSON.stringify(dic);
-    ws.send(js);
-  };
 
   var findElm = function(dic, eid) {
     var res;
@@ -489,37 +480,119 @@
     }
   };
 
-  ws.onmessage = function(ev) {
-    logger.debug('onmessage: len=' + ev.data.length)
-    var dic = JSON.parse(ev.data);
-    if ('head' in dic) {
-      var head = dic['head'];
-      if (head['_childList']) {
-        appendElements(ws, document.head, head['_childList']);
+  // websocket class
+  var DominterWs = function(url) {
+    this.url = url;
+    this.websocket = null;
+    this.waitque = [];
+    this.init();
+  };
+
+  DominterWs.prototype.send = function(dat) {
+    var st = this.websocket.readyState;
+    if (WebSocket.OPEN == st) {
+      this.websocket.send(dat);
+    } else {
+      this.waitque.push(dat);
+      if (WebSocket.CLOSING <= st) {
+        this.init();
       }
-      headId = head._id;
-      logger.debug('rcv head')
-    }
-    if ('body' in dic) {
-      var body = dic['body'];
-      if (body['_childList']) {
-        appendElements(ws, document.body, body['_childList']);
-      }
-      bodyId = body._id;
-      logger.debug('rcv body')
-    }
-    if ('_window_element' in dic) {
-      var dat = dic['_window_element'];
-      newWindow(ws, dat);
-      logger.debug('rcv _window_element')
-    }
-    if ('diff' in dic) {
-      diffproc(ws, dic, 'diff');
-      logger.debug('rcv diff')
-    }
-    if ('type' in dic) {
-      typeproc(ws, dic);
-      logger.debug('rcv type')
     }
   };
+
+  DominterWs.prototype.init = function() {
+    var ws = this;
+    var se = document.getElementById('_ws_status');
+    if (se) {
+      se.textContent = 'connecting';
+    }
+    var websocket = new WebSocket(this.url);
+    this.websocket = websocket;
+    websocket.onopen = function(ev) {
+      logger.info('onopen');
+      var se = document.getElementById('_ws_status');
+      if (se) {
+        se.textContent = 'open';
+      }
+      var localst = parseStorage(window.localStorage);
+      var sessionst = parseStorage(window.sessionStorage);
+      var dic = {'type': 'open', 'id': 'window', 'location': window.location,
+        'localStorage': localst, 'sessionStorage': sessionst};
+      var js = JSON.stringify(dic);
+      websocket.send(js);
+    };
+
+    websocket.onclose = function(ev) {
+      logger.info('onclose');
+      var se = document.getElementById('_ws_status');
+      if (se) {
+        se.textContent = 'close';
+      }
+    };
+
+    websocket.onerror = function(ev) {
+      logger.info('onerror');
+      var se = document.getElementById('_ws_status');
+      if (se) {
+        se.textContent = 'error';
+      }
+    };
+
+    var parentinit = function(parent, exceptid) {
+      var ofs = 0;
+      var lst = parent.children;
+      while (lst.length - ofs) {
+        var elm = lst[ofs];
+        if (elm.id == exceptid) {
+          ofs = 1;
+        } else {
+          parent.removeChild(elm);
+        }
+      }
+    };
+
+    websocket.onmessage = function(ev) {
+      logger.debug('onmessage: len=' + ev.data.length)
+      var dic = JSON.parse(ev.data);
+      if ('head' in dic) {
+        parentinit(document.head, 'dominter-js');
+        var head = dic['head'];
+        if (head['_childList']) {
+          appendElements(ws, document.head, head['_childList']);
+        }
+        headId = head._id;
+        logger.debug('rcv head')
+      }
+      if ('body' in dic) {
+        document.body.innerHTML = '';
+        var body = dic['body'];
+        if (body['_childList']) {
+          appendElements(ws, document.body, body['_childList']);
+        }
+        bodyId = body._id;
+        logger.debug('rcv body')
+        while (0 < ws.waitque.length) {
+          var dat = ws.waitque.shift();
+          ws.websocket.send(dat);
+        }
+      }
+      if ('_window_element' in dic) {
+        var dat = dic['_window_element'];
+        newWindow(ws, dat);
+        logger.debug('rcv _window_element')
+      }
+      if ('diff' in dic) {
+        diffproc(ws, dic, 'diff');
+        logger.debug('rcv diff')
+      }
+      if ('type' in dic) {
+        typeproc(ws, dic);
+        logger.debug('rcv type')
+      }
+    };
+  };
+  var url = (location.protocol == 'https:' ? 'wss:' : 'ws:') +
+    location.host + wspath;
+
+  var ws = new DominterWs(url);
 })();

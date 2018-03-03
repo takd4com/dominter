@@ -1,3 +1,3 @@
 from . dom import *
 
-version = '0.2.1next'
+version = '0.2.2'
