@@ -28,6 +28,7 @@ class MyWindow(Window):
         self.sel_completed = doc.radio(value='Completed', name='sel')
         self.clear_completed = doc.button('Clear completed')
         self.editbox = None
+        self.ws_status = doc.p('init', id_='_ws_status')
 
         # view
         self.document.head.childList = [
@@ -38,6 +39,7 @@ class MyWindow(Window):
                 self.header,
                 self.main,
                 self.footer,
+                self.ws_status,
             ]),
         ]
         self.header.childList = [
