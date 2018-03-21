@@ -1655,14 +1655,15 @@ class Window(object):
         self.document = Document(self)
         #self.name = ''
         self._socks = []
+        self._modalcallback = None
         self.location = None
         self.localStorage = WinStorage(window=self, name='localStorage')
         self.sessionStorage = WinStorage(window=self, name='sessionStorage')
 
-    def add_sock(self, sock):
+    def _add_sock(self, sock):
         self._socks.append(sock)
 
-    def remove_sock(self, sock):
+    def _remove_sock(self, sock):
         if sock in self._socks:
             self._socks.remove(sock)
 
@@ -1746,6 +1747,26 @@ class Window(object):
     # def onload(self, ev): # called when uesr defined
     #    logger.debug('default onload. location:{}'.format(self.location))
 
+    def _modaldialog(self, typ, msg, callback=None, value=None):
+        if callable(callback):
+            self._modalcallback = callback
+            name = repr(callback)
+        else:
+            name = ''
+        self.document._add_diff({_OBJKEY_: typ, 'message': msg, 'callback': name, 'value': value})
+
+    def alert(self, msg, callback=None):
+        self._modaldialog('_alert', msg=msg, callback=callback)
+
+    def confirm(self, msg, callback=None):
+        self._modaldialog('_confirm', msg=msg, callback=callback)
+
+    def prompt(self, msg, value='', callback=None):
+        self._modaldialog('_prompt', msg=msg, callback=callback, value=value)
+
+    def open(self, url, name, features=None):
+        self.document._add_diff({_OBJKEY_: '_open', 'url': url, 'name': name, 'features': features})
+
     def _storage_setitem(self, key, value, name=''):
         self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'setitem': [key, value, ]})
         return True
@@ -1816,7 +1837,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
             self.window = window()
         else:
             self.window = window
-        self.window.add_sock(self)
+        self.window._add_sock(self)
 
     def open(self):
         # logger.debug('open connection: {}'.format(self))
@@ -1844,6 +1865,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
         id_ = dic['id']
         logger.debug('id: {} type:{}'.format(id_, type_))
         win = self.window
+        doc = win.document
         # logger.debug("thread:{} self:{} id: {} type:{}".format(threading.current_thread().ident, self, id_, type_))
         # system handler
         if 'open' == type_:
@@ -1853,6 +1875,15 @@ class WsHandler(tornado.websocket.WebSocketHandler):
             win.sessionStorage._raw_update(dic.get('sessionStorage'))
             if hasattr(win, 'onload'):
                 win.onload(None)
+                self.sync()
+            return
+        if 'confirm' == type_ or 'prompt' == type_ or 'alert' == type_:
+            doc = win.document
+            cb = win._modalcallback
+            if callable(cb):
+                res = dic.get('value')
+                doc._clean_diff()
+                cb(res)
                 self.sync()
             return
         if 'change' == type_:
@@ -1915,7 +1946,7 @@ class WsHandler(tornado.websocket.WebSocketHandler):
     def on_close(self):
         logger.debug('close connection: {}'.format(self))
         # logger.debug("thread:{} self:{} open connection.".format(threading.current_thread().ident, self))
-        self.window.remove_sock(self)
+        self.window._remove_sock(self)
         wins = str(self.window)
         if self in self.clients[wins]:
             self.clients[wins].remove(self)

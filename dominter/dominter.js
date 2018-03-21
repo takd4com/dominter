@@ -40,6 +40,12 @@
 
   var handlerDic = {};
 
+  var modalCallback = function(ws, type_, id_, value) {
+      var dic = {'id': id_, 'type': type_, 'value': value};
+      var js = JSON.stringify(dic);
+      ws.send(js);
+  };
+
   var createEventHandler = function(ws, type_, id_) {
     var handler = function(ev) {
       var dic = {'id': id_};
@@ -263,6 +269,37 @@
         }
         else if ('clear' in dat) {
           storage.clear();
+        }
+        continue;
+      }
+      else if (objid == '_alert') {
+        var msg = dat['message'];
+        window.alert(msg);
+        modalCallback(ws, 'alert', '_alert', true);
+        continue;
+      }
+      else if (objid == '_confirm') {
+        var msg = dat['message'];
+        var res = window.confirm(msg);
+        modalCallback(ws, 'confirm', '_confirm', res);
+        continue;
+      }
+      else if (objid == '_prompt') {
+        var msg = dat['message'];
+        var val = dat['value'];
+        var res = window.prompt(msg, val);
+        modalCallback(ws, 'prompt', '_prompt', res);
+        continue;
+      }
+      else if (objid == '_open') {
+        var url = dat['url'];
+        var name = dat['name'];
+        var features = dat['features'];
+        if (features) {
+          window.open(url, name, features);
+        }
+        else {
+          window.open(url, name);
         }
         continue;
       }
@@ -493,9 +530,16 @@
     if (WebSocket.OPEN == st) {
       this.websocket.send(dat);
     } else {
+      /*
+      // auto reconnect
       this.waitque.push(dat);
       if (WebSocket.CLOSING <= st) {
         this.init();
+      }
+      */
+      var res = window.confirm('Connection terminated. OK to reload.')
+      if (res) {
+        location.reload();
       }
     }
   };
