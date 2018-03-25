@@ -2024,18 +2024,16 @@ def make_app(wins, js_path="/dominter.js", ws_path_pre='/_ws',
     return applst, winlst
 
 
-def start_app(wins, port=8888, template_path=None, static_path=None,
+def start_app(wins, port=8888,
               js_path="/dominter.js", ws_path_pre='/_ws',
               html_pre='/index', html_post='.html', background_msec=2000,
-              websocket_ping_interval=20,
-              silent=False):
+              websocket_ping_interval=20, silent=False,
+              ex_apps=None, template_path=None, static_path=None, **settings):
     """
     start tornado app for dominter
     :param wins: window list. if class is provided, act as multiple-instance.
      if instance is provided, act as single-instance.
     :param port: http/websocket port
-    :param template_path: tornado template_path
-    :param static_path: tornado static_path
     :param js_path: dominter.js path
     :param ws_path_pre: dominter websocket server path prefix (add index for each window)
     :param html_pre: html path prefix. default='/index'
@@ -2044,19 +2042,24 @@ def start_app(wins, port=8888, template_path=None, static_path=None,
      in milli seconds.
     :param websocket_ping_interval: websocket ping interval
     :param silent: suppress start message
+    :param ex_apps: tornado extra apps
+    :param template_path: tornado template_path
+    :param static_path: tornado static_path
+    :param settings: tornado settings
     :return: None
     """
     applst, winlst = make_app(wins, js_path=js_path, ws_path_pre=ws_path_pre,
                               html_pre=html_pre, html_post=html_post,
                               silent=silent)
-    if template_path is None:
-        app = tornado.web.Application(applst,
-                                      websocket_ping_interval=websocket_ping_interval)
-    else:
-        app = tornado.web.Application(applst,
-                                      websocket_ping_interval=websocket_ping_interval,
-                                      template_path=template_path,
-                                      static_path=static_path)
+    if ex_apps is not None:
+        applst.extend(ex_apps)
+    if template_path is not None:
+        settings['template_path'] = template_path
+    if static_path is not None:
+        settings['static_path'] = static_path
+    app = tornado.web.Application(applst,
+                                  websocket_ping_interval=websocket_ping_interval,
+                                  **settings)
 
     def periodic():
         # logger.debug("thread:{}".format(threading.current_thread().ident))
