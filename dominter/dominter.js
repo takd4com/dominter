@@ -303,6 +303,68 @@
         }
         continue;
       }
+      else if (objid == '_blur') {
+        window.blur();
+        continue;
+      }
+      else if (objid == '_focus') {
+        window.focus();
+        continue;
+      }
+      else if (objid == '_minimize') {
+        window.minimize();
+        continue;
+      }
+      else if (objid == '_close') {
+        window.close();
+        continue;
+      }
+      else if (objid == '_print') {
+        window.print();
+        continue;
+      }
+      else if (objid == '_moveBy') {
+        var x = dat['x'];
+        var y = dat['y'];
+        window.moveBy(x, y);
+        continue;
+      }
+      else if (objid == '_moveTo') {
+        var x = dat['x'];
+        var y = dat['y'];
+        window.moveTo(x, y);
+        continue;
+      }
+      else if (objid == '_resizeBy') {
+        var x = dat['x'];
+        var y = dat['y'];
+        window.resizeBy(x, y);
+        continue;
+      }
+      else if (objid == '_resizeTo') {
+        var x = dat['x'];
+        var y = dat['y'];
+        window.resizeTo(x, y);
+        continue;
+      }
+      else if (objid == '_scroll') {
+        var x = dat['x'];
+        var y = dat['y'];
+        window.scroll(x, y);
+        continue;
+      }
+      else if (objid == '_scrollBy') {
+        var x = dat['x'];
+        var y = dat['y'];
+        window.scrollBy(x, y);
+        continue;
+      }
+      else if (objid == '_scrollTo') {
+        var x = dat['x'];
+        var y = dat['y'];
+        window.scrollTo(x, y);
+        continue;
+      }
       var elm = document.getElementById(objid);
       if (!elm) {
         if (objid == headId) {
@@ -476,11 +538,41 @@
           var fnc = lst[1];
           removeEventHandler(elm, typ, fnc);
         }
-        if ('_focus' in dat) {
-          elm.focus();
-        }
-        if ('_blur' in dat) {
-          elm.blur();
+        if ('_method' in dat) {
+          var fnc = dat['_method'];
+          if ('focus' == fnc) {
+            elm.focus();
+          }
+          else if ('blur' == fnc) {
+            elm.blur();
+          }
+          else if ('scrollIntoView' == fnc) {
+            var alignToTop = dat['alignToTop'];
+            var behavior = dat['behavior'];
+            var block = dat['block'];
+            var inline = dat['inline'];
+            if (alignToTop === null) {
+              if (behavior || block || inline) {
+                var opt = {};
+                if (behavior) {
+                  opt['behavior'] = behavior;
+                }
+                if (block) {
+                  opt['block'] = block;
+                }
+                if (inline) {
+                  opt['inline'] = inline;
+                }
+                elm.scrollIntoView(opt);
+              }
+              else {
+                elm.scrollIntoView();
+              }
+            }
+            else {
+              elm.scrollIntoView(alignToTop);
+            }
+          }
         }
       }
       if ('_createElement' in dat) {

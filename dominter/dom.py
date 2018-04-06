@@ -803,10 +803,15 @@ class Element(object):
             del(self.document._handlers[name])
 
     def focus(self):
-        self.document._add_diff({_OBJKEY_: self._id, '_focus': True})
+        self.document._add_diff({_OBJKEY_: self._id, '_method': 'focus'})
 
     def blur(self):
-        self.document._add_diff({_OBJKEY_: self._id, '_blur': True})
+        self.document._add_diff({_OBJKEY_: self._id, '_method': 'blur'})
+
+    def scrollIntoView(self, alignToTop=None, behavior=None, block=None, inline=None):
+        self.document._add_diff({_OBJKEY_: self._id, '_method': 'scrollIntoView',
+                                 'alignToTop': alignToTop, 'behavior': behavior,
+                                  'block': block, 'inline': inline})
 
     def _dumps(self):
         # self.onload()
@@ -1764,23 +1769,67 @@ class Window(object):
     def prompt(self, msg, value='', callback=None):
         self._modaldialog('_prompt', msg=msg, callback=callback, value=value)
 
-    def open(self, url, name, features=None):
-        self.document._add_diff({_OBJKEY_: '_open', 'url': url, 'name': name, 'features': features})
+    def open(self, url, name, features=None, callback=None):
+        # callback呼べるようにし、開いたwindowに対してresizeなどできるようにする　todo
+        self.document._add_diff({_OBJKEY_: '_open', 'url': url, 'name': name,
+                                 'features': features, 'callback': callback, })
+
+    def _simplefnc(self, typ):
+        self.document._add_diff({_OBJKEY_: typ, })
+
+    def blur(self):
+        self._simplefnc('_blur')
+
+    def focus(self):
+        self._simplefnc('_focus')
+
+    def minimize(self):
+        self._simplefnc('_minimize')
+
+    # def close(self): # can't close by myself
+    #     self._simplefnc('_close')
+
+    def print_(self):
+        self._simplefnc('_print')
+
+    def _xyfnc(self, typ, x, y):
+        self.document._add_diff({_OBJKEY_: typ, 'x': x, 'y': y})
+
+    def moveBy(self, x, y):
+        self._xyfnc('_moveBy', x, y)
+
+    def moveTo(self, x, y):
+        self._xyfnc('_moveTo', x, y)
+
+    def resizeBy(self, x, y):
+        self._xyfnc('_resizeBy', x, y)
+
+    def resizeTo(self, x, y):
+        self._xyfnc('_resizeTo', x, y)
+
+    def scroll(self, x, y):
+        self._xyfnc('_scroll', x, y)
+
+    def scrollBy(self, x, y):
+        self._xyfnc('_scrollBy', x, y)
+
+    def scrollTo(self, x, y):
+        self._xyfnc('_scrollTo', x, y)
 
     def _storage_setitem(self, key, value, name=''):
-        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'setitem': [key, value, ]})
+        self.document._add_diff({_OBJKEY_: '_' + name, 'setitem': [key, value, ]})
         return True
 
     def _storage_delitem(self, key, name=''):
-        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'delitem': key})
+        self.document._add_diff({_OBJKEY_: '_' + name, 'delitem': key})
         return True
 
     def _storage_update(self, other, name=''):
-        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'update': other})
+        self.document._add_diff({_OBJKEY_: '_' + name, 'update': other})
         return True
 
     def _storage_clear(self, name=''):
-        self.document._add_diff({_OBJKEY_: '_{}'.format(name), 'clear': True})
+        self.document._add_diff({_OBJKEY_: '_' + name, 'clear': True})
         return True
 
 
