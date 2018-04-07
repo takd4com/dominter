@@ -40,6 +40,8 @@
 
   var handlerDic = {};
 
+  var windowDic = {};
+
   var modalCallback = function(ws, type_, id_, value) {
       var dic = {'id': id_, 'type': type_, 'value': value};
       var js = JSON.stringify(dic);
@@ -236,6 +238,167 @@
     var newdic = {};
     for (var dat of dic[name]) {
       var objid = dat['_objid_'];
+      var winmethod = dat['_win_method'];
+      if (winmethod) {
+        if (winmethod == '_alert') {
+          var msg = dat['message'];
+          window.alert(msg);
+          modalCallback(ws, 'alert', '_alert', true);
+          continue;
+        }
+        else if (winmethod == '_confirm') {
+          var msg = dat['message'];
+          var res = window.confirm(msg);
+          modalCallback(ws, 'confirm', '_confirm', res);
+          continue;
+        }
+        else if (winmethod == '_prompt') {
+          var msg = dat['message'];
+          var val = dat['value'];
+          var res = window.prompt(msg, val);
+          modalCallback(ws, 'prompt', '_prompt', res);
+          continue;
+        }
+        else if (winmethod == '_open') {
+          var url = dat['url'];
+          var name = dat['name'];
+          var features = dat['features'];
+          var winid = dat['winid'];
+          var hdl;
+          if (features) {
+            hdl = window.open(url, name, features);
+          }
+          else {
+            hdl = window.open(url, name);
+          }
+          windowDic[winid] = hdl;
+        }
+        else if (winmethod == '_close') {
+          var hdl = windowDic[winid];
+          if (hdl) {
+            hdl.close();
+            delete windowDic[winid];
+          }
+          else {
+            window.close();
+          }
+        }
+        else if (winmethod == '_blur') {
+          var hdl = windowDic[winid];
+          if (hdl) {
+            hdl.blur();
+          }
+          else {
+            window.blur();
+          }
+        }
+        else if (winmethod == '_focus') {
+          var hdl = windowDic[winid];
+          if (hdl) {
+            hdl.focus();
+          }
+          else {
+            window.focus();
+          }
+        }
+        else if (winmethod == '_print') {
+          var hdl = windowDic[winid];
+          if (hdl) {
+            hdl.print();
+          }
+          else {
+            window.print();
+          }
+        }
+        else if (winmethod == '_moveBy') {
+          var hdl = windowDic[winid];
+          var x = dat['x'];
+          var y = dat['y'];
+          if (hdl) {
+            hdl.moveBy(x, y);
+          }
+          else {
+            window.moveBy(x, y);
+          }
+        }
+        else if (winmethod == '_moveTo') {
+          var hdl = windowDic[winid];
+          var x = dat['x'];
+          var y = dat['y'];
+          if (hdl) {
+            hdl.moveTo(x, y);
+          }
+          else {
+            window.moveTo(x, y);
+          }
+        }
+        else if (winmethod == '_resizeBy') {
+          var hdl = windowDic[winid];
+          var x = dat['x'];
+          var y = dat['y'];
+          if (hdl) {
+            hdl.resizeBy(x, y);
+          }
+          else {
+            window.resizeBy(x, y);
+          }
+        }
+        else if (winmethod == '_resizeTo') {
+          var hdl = windowDic[winid];
+          var x = dat['x'];
+          var y = dat['y'];
+          if (hdl) {
+            hdl.resizeTo(x, y);
+          }
+          else {
+            window.resizeTo(x, y);
+          }
+        }
+        else if (winmethod == '_scroll') {
+          var hdl = windowDic[winid];
+          var x = dat['x'];
+          var y = dat['y'];
+          if (hdl) {
+            hdl.scroll(x, y);
+          }
+          else {
+            window.scroll(x, y);
+          }
+        }
+        else if (winmethod == '_scrollBy') {
+          var hdl = windowDic[winid];
+          var x = dat['x'];
+          var y = dat['y'];
+          if (hdl) {
+            hdl.scrollBy(x, y);
+          }
+          else {
+            window.scrollBy(x, y);
+          }
+        }
+        else if (winmethod == '_scrollTo') {
+          var hdl = windowDic[winid];
+          var x = dat['x'];
+          var y = dat['y'];
+          if (hdl) {
+            hdl.scrollTo(x, y);
+          }
+          else {
+            window.scrollTo(x, y);
+          }
+        }
+        /*
+        else if (winmethod == '_minimize') {
+          var hdl = windowDic[winid];
+          if (hdl) {
+            hdl.minimize();
+          }
+          else {
+            window.minimize();
+          }
+        }*/
+        continue;
+      } else
       if (objid == '_window_handler') {
         if ('_addEventListener' in dat) {
           var lst = dat['_addEventListener'];
@@ -270,99 +433,6 @@
         else if ('clear' in dat) {
           storage.clear();
         }
-        continue;
-      }
-      else if (objid == '_alert') {
-        var msg = dat['message'];
-        window.alert(msg);
-        modalCallback(ws, 'alert', '_alert', true);
-        continue;
-      }
-      else if (objid == '_confirm') {
-        var msg = dat['message'];
-        var res = window.confirm(msg);
-        modalCallback(ws, 'confirm', '_confirm', res);
-        continue;
-      }
-      else if (objid == '_prompt') {
-        var msg = dat['message'];
-        var val = dat['value'];
-        var res = window.prompt(msg, val);
-        modalCallback(ws, 'prompt', '_prompt', res);
-        continue;
-      }
-      else if (objid == '_open') {
-        var url = dat['url'];
-        var name = dat['name'];
-        var features = dat['features'];
-        if (features) {
-          window.open(url, name, features);
-        }
-        else {
-          window.open(url, name);
-        }
-        continue;
-      }
-      else if (objid == '_blur') {
-        window.blur();
-        continue;
-      }
-      else if (objid == '_focus') {
-        window.focus();
-        continue;
-      }
-      else if (objid == '_minimize') {
-        window.minimize();
-        continue;
-      }
-      else if (objid == '_close') {
-        window.close();
-        continue;
-      }
-      else if (objid == '_print') {
-        window.print();
-        continue;
-      }
-      else if (objid == '_moveBy') {
-        var x = dat['x'];
-        var y = dat['y'];
-        window.moveBy(x, y);
-        continue;
-      }
-      else if (objid == '_moveTo') {
-        var x = dat['x'];
-        var y = dat['y'];
-        window.moveTo(x, y);
-        continue;
-      }
-      else if (objid == '_resizeBy') {
-        var x = dat['x'];
-        var y = dat['y'];
-        window.resizeBy(x, y);
-        continue;
-      }
-      else if (objid == '_resizeTo') {
-        var x = dat['x'];
-        var y = dat['y'];
-        window.resizeTo(x, y);
-        continue;
-      }
-      else if (objid == '_scroll') {
-        var x = dat['x'];
-        var y = dat['y'];
-        window.scroll(x, y);
-        continue;
-      }
-      else if (objid == '_scrollBy') {
-        var x = dat['x'];
-        var y = dat['y'];
-        window.scrollBy(x, y);
-        continue;
-      }
-      else if (objid == '_scrollTo') {
-        var x = dat['x'];
-        var y = dat['y'];
-        window.scrollTo(x, y);
         continue;
       }
       var elm = document.getElementById(objid);

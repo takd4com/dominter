@@ -1661,6 +1661,8 @@ class Window(object):
         #self.name = ''
         self._socks = []
         self._modalcallback = None
+        self._win_dic = {}
+        self._win_cnt = 0
         self.location = None
         self.localStorage = WinStorage(window=self, name='localStorage')
         self.sessionStorage = WinStorage(window=self, name='sessionStorage')
@@ -1758,7 +1760,7 @@ class Window(object):
             name = repr(callback)
         else:
             name = ''
-        self.document._add_diff({_OBJKEY_: typ, 'message': msg, 'callback': name, 'value': value})
+        self.document._add_diff({'_win_method': typ, _OBJKEY_: '', 'message': msg, 'callback': name, 'value': value})
 
     def alert(self, msg, callback=None):
         self._modaldialog('_alert', msg=msg, callback=callback)
@@ -1770,51 +1772,53 @@ class Window(object):
         self._modaldialog('_prompt', msg=msg, callback=callback, value=value)
 
     def open(self, url, name, features=None, callback=None):
-        # callback呼べるようにし、開いたwindowに対してresizeなどできるようにする　todo
-        self.document._add_diff({_OBJKEY_: '_open', 'url': url, 'name': name,
-                                 'features': features, 'callback': callback, })
+        self._win_cnt += 1
+        winid = self._win_cnt
+        self.document._add_diff({'_win_method': '_open', _OBJKEY_: '', 'url': url, 'name': name,
+                                 'features': features, 'callback': callback, 'window': winid})
+        return winid
 
-    def _simplefnc(self, typ):
-        self.document._add_diff({_OBJKEY_: typ, })
+    def _simplefnc(self, typ, window):
+        self.document._add_diff({'_win_method': typ, _OBJKEY_: window, })
 
-    def blur(self):
-        self._simplefnc('_blur')
+    def close(self, window=None):
+        self._simplefnc('_close', window)
 
-    def focus(self):
-        self._simplefnc('_focus')
+    def blur(self, window=None):
+        self._simplefnc('_blur', window)
 
-    def minimize(self):
-        self._simplefnc('_minimize')
+    def focus(self, window=None):
+        self._simplefnc('_focus', window)
 
-    # def close(self): # can't close by myself
-    #     self._simplefnc('_close')
+    #def minimize(self, window=None):
+    #    self._simplefnc('_minimize', window)
 
-    def print_(self):
-        self._simplefnc('_print')
+    def print_(self, window=None):
+        self._simplefnc('_print', window)
 
-    def _xyfnc(self, typ, x, y):
-        self.document._add_diff({_OBJKEY_: typ, 'x': x, 'y': y})
+    def _xyfnc(self, typ, x, y, window):
+        self.document._add_diff({'_win_method': typ, _OBJKEY_: window, 'x': x, 'y': y})
 
-    def moveBy(self, x, y):
-        self._xyfnc('_moveBy', x, y)
+    def moveBy(self, x, y, window=None):
+        self._xyfnc('_moveBy', x, y, window)
 
-    def moveTo(self, x, y):
-        self._xyfnc('_moveTo', x, y)
+    def moveTo(self, x, y, window=None):
+        self._xyfnc('_moveTo', x, y, window)
 
-    def resizeBy(self, x, y):
-        self._xyfnc('_resizeBy', x, y)
+    def resizeBy(self, x, y, window=None):
+        self._xyfnc('_resizeBy', x, y, window)
 
-    def resizeTo(self, x, y):
-        self._xyfnc('_resizeTo', x, y)
+    def resizeTo(self, x, y, window=None):
+        self._xyfnc('_resizeTo', x, y, window)
 
-    def scroll(self, x, y):
-        self._xyfnc('_scroll', x, y)
+    def scroll(self, x, y, window=None):
+        self._xyfnc('_scroll', x, y, window)
 
-    def scrollBy(self, x, y):
-        self._xyfnc('_scrollBy', x, y)
+    def scrollBy(self, x, y, window=None):
+        self._xyfnc('_scrollBy', x, y, window)
 
-    def scrollTo(self, x, y):
-        self._xyfnc('_scrollTo', x, y)
+    def scrollTo(self, x, y, window=None):
+        self._xyfnc('_scrollTo', x, y, window)
 
     def _storage_setitem(self, key, value, name=''):
         self.document._add_diff({_OBJKEY_: '_' + name, 'setitem': [key, value, ]})
