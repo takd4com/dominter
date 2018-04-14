@@ -9,19 +9,24 @@
   logger.INFO = 2;
   logger.logLevel = logger.DEBUG;
   //logger.logLevel = logger.INFO;
-  logger.log = function(level, disp, fnc, msg) {
-    if (level < logger.logLevel) {
-      return;
-    }
+  var nowstr = function() {
     var date = new Date();
     var ms = date.getMilliseconds();
-    fnc(date.toLocaleString() + ',' + ms + ' ' + disp + ' ' + msg);
+    return date.toLocaleString() + ',' + ms;
   }
   logger.debug = function(msg) {
-    logger.log(logger.DEBUG, 'DEBUG', console.debug, msg);
+    var disp = 'DEBUG';
+    if (logger.DEBUG < logger.logLevel) {
+      return;
+    }
+    console.debug(nowstr() + ' ' + disp + ' ' + msg);
   }
   logger.info = function(msg) {
-    logger.log(logger.INFO, 'INFO', console.info, msg);
+    var disp = 'INFO';
+    if (logger.INFO < logger.logLevel) {
+      return;
+    }
+    console.info(nowstr() + ' ' + disp + ' ' + msg);
   }
 
   // dominter
