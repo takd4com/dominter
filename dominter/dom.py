@@ -16,6 +16,7 @@ import collections
 from inspect import isclass
 from logging import (getLogger, basicConfig, DEBUG, INFO, WARN, ERROR)
 
+import tornado
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
@@ -2127,7 +2128,11 @@ def start_app(wins, port=8888,
     ioloop = tornado.ioloop.IOLoop.current()
     if background_msec > 0:
         # background worker to create cache
-        tornado.ioloop.PeriodicCallback(periodic, background_msec,
-                                        io_loop=ioloop).start()
+        if 4 >= tornado.version_info[0]:
+            tornado.ioloop.PeriodicCallback(periodic, background_msec,
+                                            io_loop=ioloop).start()
+        else:
+            tornado.ioloop.PeriodicCallback(periodic, background_msec).start()
+
     ioloop.add_callback(ThreadSafe.set_tornado_thread_id)
     ioloop.start()
