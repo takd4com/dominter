@@ -28,6 +28,13 @@
     }
     console.info(nowstr() + ' ' + disp + ' ' + msg);
   }
+  logger.error = function(msg) {
+    var disp = 'ERROR';
+    if (logger.ERROR < logger.logLevel) {
+      return;
+    }
+    console.error(nowstr() + ' ' + disp + ' ' + msg);
+  }
 
   // dominter
   var excepts = ['_in_init_', 'tagName', 'document', 'parent',
@@ -41,11 +48,59 @@
     '_sortChild', '_createElement',
     '_addEventListener', '_removeEventListener',
   ];
+  var renderingMethod2D = {
+    'addHitRegion': 0,
+    'arc': 5,
+    'arcTo': 5,
+    'beginPath': 0,
+    'bezierCurveTo': 6,
+    'clearRect': 4,
+    'clearHitRegions': 0,
+    'clearRect': 4,
+    'clip': 0,
+    'closePath': 0,
+    //'createImageData': 1,
+    //'createLinearGradient': 4,
+    //'createPattern': 2,
+    //'createRadialGradient': 6,
+    //'drawFocusIfNeeded': 1,
+    //'drawImage': 3,
+    'ellipse': 7,
+    'fill': 0,
+    'fillRect': 4,
+    'fillText': 3,
+    //'getImageData': 4,
+    //'getLineDash': 0,
+    //'isPointInPath': 2,
+    //'isPointInStroke': 2,
+    'lineTo': 2,
+    //'measureText': 1,
+    'moveTo': 2,
+    //'putImageData': 3,
+    'quadraticCurveTo': 4,
+    'rect': 4,
+    //'removeHitRegion': 1,
+    'resetTransform': 0,
+    'restore': 0,
+    'rotate': 1,
+    'save': 0,
+    'scale': 2,
+    'scrollPathIntoView': 0,
+    'setLineDash': 1,
+    'setTransform': 6,
+    'stroke': 0,
+    'strokeRect': 4,
+    'strokeText': 3,
+    'transform': 6,
+    'translate': 2,
+  };
   var headId, bodyId;
 
   var handlerDic = {};
 
   var windowDic = {};
+
+  var objectDic = {};
 
   var modalCallback = function(ws, type_, id_, value) {
       var dic = {'id': id_, 'type': type_, 'value': value};
@@ -440,6 +495,36 @@
         }
         continue;
       }
+      var objtype = dat['_objType'];
+      if ('RenderingContext' == objtype) {
+        var obj = objectDic[objid];
+        if (!obj) {
+          logger.error('unknown object id=' + objid);
+          continue;
+        }
+        var method = dat['_method'];
+        var args = dat['args'];
+        if ('setattr' == method) {
+          var key = dat['key'];
+          if (key) {
+            obj[key] = dat['value'];
+          }
+        }
+        else if (method in renderingMethod2D) {
+          var an = renderingMethod2D[method];
+          if (args.length >= an) {
+            obj[method].apply(obj, args);
+          }
+          else {
+            logger.error('bad arg count. method=' + method + ' args=' + args);
+            // need to return error
+          }
+        }
+        else {
+          logger.error('unknown method. method=' + method + ' args=' + args);
+        }
+        continue;
+      }
       var elm = document.getElementById(objid);
       if (!elm) {
         if (objid == headId) {
@@ -647,6 +732,19 @@
             else {
               elm.scrollIntoView(alignToTop);
             }
+          }
+          else if ('getContext' == fnc) {
+            var contentType = dat['contentType'];
+            var contextAttributes = dat['contextAttributes'];
+            var objid = dat['_id'];
+            var obj;
+            if (contextAttributes) {
+              obj = elm.getContext(contentType, contextAttributes);
+            }
+            else {
+              obj = elm.getContext(contentType);
+            }
+            objectDic[objid] = obj;
           }
         }
       }

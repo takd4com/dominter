@@ -814,6 +814,10 @@ class Element(object):
                                  'alignToTop': alignToTop, 'behavior': behavior,
                                   'block': block, 'inline': inline})
 
+    def getContext(self, contextType, contextAttributes=None):
+        res = RenderingContext(self, contextType, contextAttributes)
+        return res
+
     def _dumps(self):
         # self.onload()
         str = json.dumps(self, default=self._serializer, indent=2)
@@ -1020,6 +1024,49 @@ class Element(object):
     def _style_clear(self):
         self.document._add_diff({_OBJKEY_: self._id, '_clearStyle': True})
         return True
+
+
+class RenderingContext(object):
+    def __init__(self, canvas, contextType, contextAttributes=None):
+        self._id = str(id(self))
+        self.canvas = canvas
+        canvas.document._add_diff({_OBJKEY_: canvas._id,
+                                   '_method': 'getContext',
+                                   'contentType': contextType,
+                                   'contextAttributes': contextAttributes,
+                                   '_id': self._id,
+                                   })
+    excepts = ('_id', 'canvas', 'excepts')
+
+    def _raw_setattr(self, key, value):
+        super(RenderingContext, self).__setattr__(key, value)
+
+    def _raw_getattr(self, name):
+        return super(RenderingContext, self).__getattr__(name)
+
+    def __setattr__(self, key, value):
+        # logger.debug('thread:{} key:{} value:{}'.format(threading.current_thread().ident, key, value))
+        if key in self.excepts:
+            super(RenderingContext, self).__setattr__(key, value)
+            return
+        self.canvas.document._add_diff({_OBJKEY_: self._id,
+                                        '_objType': 'RenderingContext',
+                                        '_method': 'setattr',
+                                        'key': key,
+                                        'value': value,
+                                        })
+        super(RenderingContext, self).__setattr__(key, value)
+
+    def __getattr__(self, name):
+        if name in self.excepts:
+            return super(RenderingContext, self).__getattr__(name)
+        def fnc(*args):
+            self.canvas.document._add_diff({_OBJKEY_: self._id,
+                                            '_objType': 'RenderingContext',
+                                            '_method': name,
+                                            'args': args})
+        self._raw_setattr(name, fnc)
+        return fnc
 
 
 class Document(object):
