@@ -8,6 +8,11 @@
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/clearRect
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/clip
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/closePath
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/createLinearGradient
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/createPattern
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/createRadialGradient
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawFocusIfNeeded
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fill
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillRect
@@ -29,7 +34,32 @@
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/strokeText
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/transform
 # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/translate
+# https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Applying_styles_and_colors
+#
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillStyle
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalAlpha
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineCap
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineDashOffset
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineJoin
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/miterLimit
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/shadowBlur
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/shadowOffsetX
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/shadowOffsetY
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/strokeStyle
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/textAlign
+# https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/textBaseline
+#
 # These examples by Mozilla Contributors are licensed under CC-BY-SA 2.5(https://creativecommons.org/licenses/by-sa/2.5/).
+#
+# unsupported:
+# createImageData()
+# getImageData()
+# getLineDash()
+# isPointInPath()
+# isPointInStroke()
+# measureText()
+# putImageData()
 #
 import math
 import argparse
@@ -48,7 +78,14 @@ class MyWindow(Window):
 
         # elements
         self.header = doc.header()
-        self.canvas1 = doc.tag('canvas width="310" height="210" style="background-color:yellow;"')
+        self.imgsrc = doc.tag('div style="display:none;"', childList=[
+            doc.tag('img id="source" src="https://mdn.mozillademos.org/files/5397/rhino.jpg" width="300" height="227"')
+        ])
+        self.canvas1 = doc.tag('canvas width="310" height="210" style="background-color:yellow;"', childList=[
+            doc.tag('input id="button" type="range" min="1" max="12"')  # for drawFocusIfNeeded()
+        ])
+
+        self.number1 = doc.number(value=0.5, step=0.1)
 
         self.arc_btn = doc.button('arc')
         self.arcTo_btn = doc.button('arcTo')
@@ -57,6 +94,11 @@ class MyWindow(Window):
         self.clearRect_btn = doc.button('clearRect')
         self.clip_btn = doc.button('clip')
         self.closePath_btn = doc.button('closePath')
+        self.createLinearGradient_btn = doc.button('createLinearGradient')
+        self.createRadialGradient_btn = doc.button('createRadialGradient')
+        self.createPattern_btn = doc.button('createPattern')
+        self.drawFocusIfNeeded_btn = doc.button('drawFocusIfNeeded')
+        self.drawImage_btn = doc.button('drawImage')
         self.ellipse_btn = doc.button('ellipse')
         self.fill_btn =doc.button('fill')
         self.fillRect_btn = doc.button('fillRect')
@@ -78,10 +120,27 @@ class MyWindow(Window):
         self.strokeText_btn = doc.button('strokeText')
         self.transform_btn = doc.button('transform')
         self.translate_btn = doc.button('translate')
+        #
+        self.fillStyle_btn = doc.button('fillStyle ')
+        self.globalAlpha_btn = doc.button('globalAlpha')
+        self.globalCompositeOperation_btn = doc.button('globalCompositeOperation')
+        self.lineCap_btn = doc.button('lineCap')
+        self.lineDashOffset_btn = doc.button('lineDashOffset')
+        self.miterLimit_btn = doc.button('miterLimit')
+        self.lineJoin_btn = doc.button('lineJoin')
+        self.shadowBlur_btn = doc.button('shadowBlur')
+        self.shadowOffsetX_btn = doc.button('shadowOffsetX')
+        self.shadowOffsetY_btn = doc.button('shadowOffsetY')
+        self.strokeStyle_btn = doc.button('strokeStyle')
+        self.textAlign_btn = doc.button('textAlign')
+        self.textBaseline_btn = doc.button('textBaseline')
 
         # view
         doc.body.childList.extend([
+            self.imgsrc,
             self.canvas1,
+            doc.br(),
+            self.number1,
             doc.br(),
             self.arc_btn,
             self.arcTo_btn,
@@ -90,6 +149,11 @@ class MyWindow(Window):
             self.clearRect_btn,
             self.clip_btn,
             self.closePath_btn,
+            self.createLinearGradient_btn,
+            self.createRadialGradient_btn,
+            self.createPattern_btn,
+            self.drawFocusIfNeeded_btn,
+            self.drawImage_btn,
             self.ellipse_btn,
             self.fill_btn,
             self.fillRect_btn,
@@ -111,6 +175,20 @@ class MyWindow(Window):
             self.strokeText_btn,
             self.transform_btn,
             self.translate_btn,
+            doc.br(),
+            self.fillStyle_btn,
+            self.globalAlpha_btn,
+            self.globalCompositeOperation_btn,
+            self.lineCap_btn,
+            self.lineDashOffset_btn,
+            self.lineJoin_btn,
+            self.miterLimit_btn,
+            self.shadowBlur_btn,
+            self.shadowOffsetX_btn,
+            self.shadowOffsetY_btn,
+            self.strokeStyle_btn,
+            self.textAlign_btn,
+            self.textBaseline_btn,
         ])
 
         # event listeners
@@ -121,6 +199,11 @@ class MyWindow(Window):
         self.clearRect_btn.addEventListener('click', self.on_clearRect_btn)
         self.clip_btn.addEventListener('click', self.on_clip_btn)
         self.closePath_btn.addEventListener('click', self.on_closePath_btn)
+        self.createLinearGradient_btn.addEventListener('click', self.on_createLinearGradient_btn)
+        self.createRadialGradient_btn.addEventListener('click', self.on_createRadialGradient_btn)
+        self.createPattern_btn.addEventListener('click', self.on_createPattern_btn)
+        self.drawFocusIfNeeded_btn.addEventListener('click', self.on_drawFocusIfNeeded_btn)
+        self.drawImage_btn.addEventListener('click', self.on_drawImage_btn)
         self.ellipse_btn.addEventListener('click', self.on_ellipse_btn)
         self.fill_btn.addEventListener('click', self.on_fill_btn)
         self.fillRect_btn.addEventListener('click', self.on_fillRect_btn)
@@ -142,6 +225,19 @@ class MyWindow(Window):
         self.strokeText_btn.addEventListener('click', self.on_strokeText_btn)
         self.transform_btn.addEventListener('click', self.on_transform_btn)
         self.translate_btn.addEventListener('click', self.on_translate_btn)
+        self.fillStyle_btn.addEventListener('click', self.on_fillStyle_btn)
+        self.globalAlpha_btn.addEventListener('click', self.on_globalAlpha_btn)
+        self.globalCompositeOperation_btn.addEventListener('click', self.on_globalCompositeOperation_btn)
+        self.lineCap_btn.addEventListener('click', self.on_lineCap_btn)
+        self.lineDashOffset_btn.addEventListener('click', self.on_lineDashOffset_btn)
+        self.lineJoin_btn.addEventListener('click', self.on_lineJoin_btn)
+        self.miterLimit_btn.addEventListener('click', self.on_miterLimit_btn)
+        self.shadowBlur_btn.addEventListener('click', self.on_shadowBlur_btn)
+        self.shadowOffsetX_btn.addEventListener('click', self.on_shadowOffsetX_btn)
+        self.shadowOffsetY_btn.addEventListener('click', self.on_shadowOffsetY_btn)
+        self.strokeStyle_btn.addEventListener('click', self.on_strokeStyle_btn)
+        self.textAlign_btn.addEventListener('click', self.on_textAlign_btn)
+        self.textBaseline_btn.addEventListener('click', self.on_textBaseline_btn)
 
         # work
         self.ctx = None
@@ -239,6 +335,66 @@ class MyWindow(Window):
         ctx.lineTo(120, 120)
         ctx.closePath()    # draws last line of the triangle
         ctx.stroke()
+
+    def on_createLinearGradient_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/createLinearGradient
+        if False:
+            ctx = self.get_ctx()
+            gradient = ctx.createLinearGradient(0, 0, 200, 0)
+            gradient.addColorStop(0, 'green')
+            gradient.addColorStop(1, 'white')
+            ctx.fillStyle = gradient
+            ctx.fillRect(10, 10, 200, 100)
+        else:
+            with self.canvas1.getContext('2d') as ctx:
+                with ctx.createLinearGradient(0, 0, 200, 0) as gradient:
+                    gradient.addColorStop(0, 'green')
+                    gradient.addColorStop(1, 'white')
+                    ctx.fillStyle = gradient
+                    ctx.fillRect(10, 10, 200, 100)
+
+    def on_createPattern_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/createPattern
+        ctx = self.get_ctx()
+        img = self.Image()
+        img.src = 'https://mdn.mozillademos.org/files/222/Canvas_createpattern.png'
+        def onload(evnt):
+            pattern = ctx.createPattern(img, 'repeat')
+            ctx.fillStyle = pattern
+            ctx.fillRect(0, 0, 400, 400)
+        img.addEventListener('load', onload)
+
+    def on_createRadialGradient_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/createRadialGradient
+        if False:
+            ctx = self.get_ctx()
+            gradient = ctx.createRadialGradient(100, 100, 50, 100, 100, 100)
+            gradient.addColorStop(0, 'white')
+            gradient.addColorStop(1, 'green')
+            ctx.fillStyle = gradient
+            ctx.fillRect(0, 0, 200, 200)
+        else:
+            with self.canvas1.getContext('2d') as ctx:
+                with ctx.createRadialGradient(100, 100, 50, 100, 100, 100) as gradient:
+                    gradient.addColorStop(0, 'white')
+                    gradient.addColorStop(1, 'green')
+                    ctx.fillStyle = gradient
+                    ctx.fillRect(0, 0, 200, 200)
+
+    def on_drawFocusIfNeeded_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawFocusIfNeeded
+        ctx = self.get_ctx()
+        button = self.document.getElementById('button')
+        button.focus()
+        ctx.beginPath()
+        ctx.rect(10, 10, 30, 30)
+        ctx.drawFocusIfNeeded(button)
+
+    def on_drawImage_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage
+        ctx = self.get_ctx()
+        image = self.document.getElementById('source')
+        ctx.drawImage(image, 33, 71, 104, 124, 21, 20, 87, 104)
 
     def on_ellipse_btn(self, evnt):
         # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/ellipse
@@ -413,6 +569,152 @@ class MyWindow(Window):
 
         # reset current transformation matrix to the identity matrix
         ctx.setTransform(1, 0, 0, 1, 0, 0)
+
+    def on_fillStyle_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillStyle
+        ctx = self.get_ctx()
+        for i in range (0, 6):
+            for j in range(0, 6):
+                ctx.fillStyle = ('rgb({}, {}, 0)'.format(
+                    math.floor(255-42.5 * i),
+                    math.floor(255-42.5 * j)))
+                ctx.fillRect(j * 25, i * 25, 25, 25)
+
+    def on_globalAlpha_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalAlpha
+        ctx = self.get_ctx()
+        ctx.globalAlpha = self.number1.value
+        ctx.fillStyle = "blue"
+        ctx.fillRect(10, 10, 100, 100)
+        ctx.fillStyle = "red"
+        ctx.fillRect(50, 50, 100, 100)
+
+    def on_lineCap_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineCap
+        ctx = self.get_ctx()
+        ctx.beginPath()
+        ctx.moveTo(0, 0)
+        ctx.lineWidth = 15
+        ctx.lineCap = 'round'
+        ctx.lineTo(100, 100)
+        ctx.stroke()
+
+    def on_globalCompositeOperation_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+        ctx = self.get_ctx()
+        ctx.globalCompositeOperation = 'xor'
+        ctx.fillStyle = 'blue'
+        ctx.fillRect(10, 10, 100, 100)
+        ctx.fillStyle = 'red'
+        ctx.fillRect(50, 50, 100, 100)
+
+    def on_lineDashOffset_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineDashOffset
+        ctx = self.get_ctx()
+        ctx.setLineDash([4, 16])
+        ctx.lineDashOffset = self.number1.value
+        ctx.beginPath()
+        ctx.moveTo(0, 100)
+        ctx.lineTo(400, 100)
+        ctx.stroke()
+
+    def on_lineJoin_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/lineJoin
+        ctx = self.get_ctx()
+        ctx.lineWidth = 10
+        ctx.lineJoin = 'round'
+        ctx.beginPath()
+        ctx.moveTo(0, 0)
+        ctx.lineTo(200, 100)
+        ctx.lineTo(300, 0)
+        ctx.stroke()
+
+    def on_miterLimit_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/miterLimit
+        ctx = self.get_ctx()
+        # Clear canvas
+        ctx.clearRect(0, 0, 150, 150)
+        # Draw guides
+        ctx.strokeStyle = '#09f'
+        ctx.lineWidth = 2
+        ctx.strokeRect(-5, 50, 160, 50)
+        # Set line styles
+        ctx.strokeStyle = '#000'
+        ctx.lineWidth = 10
+        # check input
+        ctx.miterLimit = self.number1.value
+        # Draw lines
+        ctx.beginPath()
+        ctx.moveTo(0, 100)
+        for i in range(0, 24):
+            dy = 25 if i % 2 == 0 else -25
+            ctx.lineTo(math.pow(i, 1.5) * 2, 75 + dy)
+        ctx.stroke()
+
+    def on_shadowBlur_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/shadowBlur
+        ctx = self.get_ctx()
+        ctx.shadowColor = 'black'
+        ctx.shadowBlur = 10
+        ctx.fillStyle = 'white'
+        ctx.fillRect(10, 10, 100, 100)
+
+    def on_shadowOffsetX_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/shadowOffsetX
+        ctx = self.get_ctx()
+        ctx.shadowColor = 'black'
+        ctx.shadowOffsetX = 10
+        ctx.shadowBlur = 10
+        ctx.fillStyle = 'green'
+        ctx.fillRect(10, 10, 100, 100)
+
+    def on_shadowOffsetY_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/shadowOffsetX
+        ctx = self.get_ctx()
+        ctx.shadowColor = 'black'
+        ctx.shadowOffsetY = 10
+        ctx.shadowBlur = 10
+        ctx.fillStyle = 'green'
+        ctx.fillRect(10, 10, 100, 100)
+
+    def on_strokeStyle_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/strokeStyle
+        ctx = self.get_ctx()
+        for i in range (0, 6):
+            for j in range(0, 6):
+                ctx.strokeStyle = ('rgb(0, {}, {})'.format(
+                    math.floor(255-42.5 * i),
+                    math.floor(255-42.5 * j)))
+                ctx.beginPath()
+                ctx.arc(12.5 + j * 25, 12.5 + i * 25, 10, 0, math.pi * 2, True)
+                ctx.stroke()
+
+    def on_textAlign_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/textAlign
+        ctx = self.get_ctx()
+        ctx.font = '48px serif'
+        ctx.textAlign = 'left'
+        #ctx.textAlign = 'right'
+        #ctx.textAlign = 'center'
+        #ctx.textAlign = 'start'
+        #ctx.textAlign = 'end'
+        ctx.strokeText('Hello world', 0, 100)
+
+    def on_textBaseline_btn(self, evnt):
+        # https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/textBaseline
+        ctx = self.get_ctx()
+        baselines = ['top', 'hanging', 'middle', 'alphabetic', 'ideographic', 'bottom']
+        ctx.font = '20px serif'
+        ctx.strokeStyle = 'red'
+        def fnc(baseline, index):
+            ctx.textBaseline = baseline
+            y = 20 + index * 33
+            ctx.beginPath()
+            ctx.moveTo(0, y + 0.5)
+            ctx.lineTo(550, y + 0.5)
+            ctx.stroke()
+            ctx.fillText('Abcdefghijklmnop (' + baseline + ')', 0, y)
+        list([fnc(baseline, index) for index, baseline in enumerate(baselines)])
 
 
 def get_arg_port():

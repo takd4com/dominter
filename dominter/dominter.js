@@ -49,50 +49,52 @@
     '_addEventListener', '_removeEventListener',
   ];
   var renderingMethod2D = {
-    'addHitRegion': 0,
-    'arc': 5,
-    'arcTo': 5,
-    'beginPath': 0,
-    'bezierCurveTo': 6,
-    'clearRect': 4,
-    'clearHitRegions': 0,
-    'clearRect': 4,
-    'clip': 0,
-    'closePath': 0,
-    //'createImageData': 1,
-    //'createLinearGradient': 4,
-    //'createPattern': 2,
-    //'createRadialGradient': 6,
-    //'drawFocusIfNeeded': 1,
-    //'drawImage': 3,
-    'ellipse': 7,
-    'fill': 0,
-    'fillRect': 4,
-    'fillText': 3,
-    //'getImageData': 4,
-    //'getLineDash': 0,
-    //'isPointInPath': 2,
-    //'isPointInStroke': 2,
-    'lineTo': 2,
-    //'measureText': 1,
-    'moveTo': 2,
-    //'putImageData': 3,
-    'quadraticCurveTo': 4,
-    'rect': 4,
-    //'removeHitRegion': 1,
-    'resetTransform': 0,
-    'restore': 0,
-    'rotate': 1,
-    'save': 0,
-    'scale': 2,
-    'scrollPathIntoView': 0,
-    'setLineDash': 1,
-    'setTransform': 6,
-    'stroke': 0,
-    'strokeRect': 4,
-    'strokeText': 3,
-    'transform': 6,
-    'translate': 2,
+    'addHitRegion': [0, false],
+    'arc': [5, false],
+    'arcTo': [5, false],
+    'beginPath': [0, false],
+    'bezierCurveTo': [6, false],
+    'clearRect': [4, false],
+    'clearHitRegions': [0, false],
+    'clearRect': [4, false],
+    'clip': [0, false],
+    'closePath': [0, false],
+    //'createImageData': [1, true],
+    'createLinearGradient': [4, true],
+    'createPattern': [2, true],
+    'createRadialGradient': [6, true],
+    'drawFocusIfNeeded': [1, false],
+    'drawImage': [3, true],
+    'ellipse': [7, false],
+    'fill': [0, false],
+    'fillRect': [4, false],
+    'fillText': [3, false],
+    //'getImageData': [4, true],
+    //'getLineDash': [0, true],
+    //'isPointInPath': [2, true],
+    //'isPointInStroke': [2, true],
+    'lineTo': [2, false],
+    //'measureText': [1, true],
+    'moveTo': [2, false],
+    //'putImageData': [3, true],
+    'quadraticCurveTo': [4, false],
+    'rect': [4, false],
+    'removeHitRegion': [1, false],
+    'resetTransform': [0, false],
+    'restore': [0, false],
+    'rotate': [1, false],
+    'save': [0, false],
+    'scale': [2, false],
+    'scrollPathIntoView': [0, false],
+    'setLineDash': [1, false],
+    'setTransform': [6, false],
+    'stroke': [0, false],
+    'strokeRect': [4, false],
+    'strokeText': [3, false],
+    'transform': [6, false],
+    'translate': [2, false],
+    //
+    'addColorStop': [2, false],
   };
   var headId, bodyId;
 
@@ -294,6 +296,24 @@
     return res;
   };
 
+  var getArgs = function(lst) {
+    var args = [];
+    for (var arg of lst) {
+      if (('object' == (typeof arg))&& arg['_id']) {
+        var objid = arg['_id'];
+        var obj = objectDic[objid];
+        if (!obj) {
+          obj = document.getElementById(objid);
+        }
+        args.push(obj);
+      }
+      else {
+        args.push(arg);
+      }
+    }
+    return args;
+  }
+
   var diffproc = function(ws, dic, name) {
     var newdic = {};
     for (var dat of dic[name]) {
@@ -457,6 +477,50 @@
             window.minimize();
           }
         }*/
+        else if (winmethod == '_create') {
+          var typ = dat['_objType'];
+          var args = getArgs(dat['args']);
+          var newid = dat['_id'];
+          var newobj;
+          if (typ == 'Image') {
+            if (2 == args.length) {
+              newobj = new Image(args[0], args[1]);
+            }
+            else {
+              newobj = new Image();
+            }
+          }
+          else {
+            var obj = objectDic[objid];
+            var method = dat['_method'];
+            if (obj && method) {
+              if (method in renderingMethod2D) {
+                var mp = renderingMethod2D[method];
+                var an = mp[0];
+                if (args.length >= an) {
+                  var res = obj[method].apply(obj, args);
+                  if (mp[1]||(dat['_register'])) {
+                    newobj = res;
+                  }
+                }
+                else {
+                  logger.error('bad arg count. method=' + method + ' args=' + args);
+                  // need to return error
+                }
+              }
+            }
+            else {
+              logger.error('obj or method is null');
+            }
+          }
+          if (newobj) {
+            objectDic[newid] = newobj;
+          }
+          else {
+            logger.error('bad params');
+          }
+        }
+
         continue;
       } else
       if (objid == '_window_handler') {
@@ -495,33 +559,68 @@
         }
         continue;
       }
-      var objtype = dat['_objType'];
-      if ('RenderingContext' == objtype) {
-        var obj = objectDic[objid];
-        if (!obj) {
-          logger.error('unknown object id=' + objid);
-          continue;
-        }
-        var method = dat['_method'];
-        var args = dat['args'];
-        if ('setattr' == method) {
-          var key = dat['key'];
-          if (key) {
-            obj[key] = dat['value'];
+      var obj = objectDic[objid];
+      if (obj) {
+        var objtype = dat['_objType'];
+        if ('RenderingContext' == objtype) {
+          var method = dat['_method'];
+          var args = dat['args'];
+          if ('setattr' == method) {
+            var key = dat['key'];
+            if (key) {
+              var value = dat['value'];
+              if (dat['_valueType'] == 'DomObject') {
+                value = objectDic[value];
+              }
+              obj[key] = value;
+            }
           }
-        }
-        else if (method in renderingMethod2D) {
-          var an = renderingMethod2D[method];
-          if (args.length >= an) {
-            obj[method].apply(obj, args);
+          else if ('__del__' == method) {
+            logger.info('delete from objectDic: ' + objid);  //tmp
+            delete objectDic[objid];
+          }
+          else if (method in renderingMethod2D) {
+            var mp = renderingMethod2D[method];
+            var an = mp[0];
+            if (args.length >= an) {
+              var ca = getArgs(args);
+              var res = obj[method].apply(obj, ca);
+              if (mp[1]||(dat['_register'])) {
+                var _id = dat['_id'];
+                objectDic[_id] = res;
+                logger.info('add DomObject to objectDic: ' + _id);  //tmp
+              }
+            }
+            else {
+              logger.error('bad arg count. method=' + method + ' args=' + args);
+              // need to return error
+            }
           }
           else {
-            logger.error('bad arg count. method=' + method + ' args=' + args);
-            // need to return error
+            logger.error('unknown method. method=' + method + ' args=' + args);
           }
         }
-        else {
-          logger.error('unknown method. method=' + method + ' args=' + args);
+        else {  // Image,...
+          var method = dat['_method'];
+          if ('setattr' == method) {
+            var key = dat['key'];
+            var value = dat['value'];
+            var vt = dat['_valueType'];
+            if (vt == 'DomObject') {
+              value = objectDic[value];
+              if (!value) {
+                logger.error('setattr: dom object not found. key=' + key + ' value=' + dat['value']);
+              }
+            }
+            obj[key] = value;
+          }
+          else if ('addEventListener' == method) {
+            var lst = dat['args'];
+            var typ = lst[0];
+            var fnc = lst[1];
+            var hdr = createEventHandler(ws, typ, fnc);
+            var res = obj[method].apply(obj, [typ, hdr, false]);
+          }
         }
         continue;
       }
@@ -541,6 +640,57 @@
         }
       }
       if (elm) {
+        if ('_method' in dat) {
+          var fnc = dat['_method'];
+          if ('focus' == fnc) {
+            elm.focus();
+          }
+          else if ('blur' == fnc) {
+            elm.blur();
+          }
+          else if ('scrollIntoView' == fnc) {
+            var alignToTop = dat['alignToTop'];
+            var behavior = dat['behavior'];
+            var block = dat['block'];
+            var inline = dat['inline'];
+            if (alignToTop === null) {
+              if (behavior || block || inline) {
+                var opt = {};
+                if (behavior) {
+                  opt['behavior'] = behavior;
+                }
+                if (block) {
+                  opt['block'] = block;
+                }
+                if (inline) {
+                  opt['inline'] = inline;
+                }
+                elm.scrollIntoView(opt);
+              }
+              else {
+                elm.scrollIntoView();
+              }
+            }
+            else {
+              elm.scrollIntoView(alignToTop);
+            }
+          }
+          else if ('getContext' == fnc) {
+            var contentType = dat['contentType'];
+            var contextAttributes = dat['contextAttributes'];
+            var objid = dat['_id'];
+            var obj;
+            if (contextAttributes) {
+              obj = elm.getContext(contentType, contextAttributes);
+            }
+            else {
+              obj = elm.getContext(contentType);
+            }
+            objectDic[objid] = obj;
+            logger.info('add RenderingContext to objectDic: ' + objid);  //tmp
+          }
+          continue;
+        }
         if (dat['id'] !== undefined) {
           elm.id = dat['id'];
         }
@@ -697,55 +847,6 @@
           var typ = lst[0];
           var fnc = lst[1];
           removeEventHandler(elm, typ, fnc);
-        }
-        if ('_method' in dat) {
-          var fnc = dat['_method'];
-          if ('focus' == fnc) {
-            elm.focus();
-          }
-          else if ('blur' == fnc) {
-            elm.blur();
-          }
-          else if ('scrollIntoView' == fnc) {
-            var alignToTop = dat['alignToTop'];
-            var behavior = dat['behavior'];
-            var block = dat['block'];
-            var inline = dat['inline'];
-            if (alignToTop === null) {
-              if (behavior || block || inline) {
-                var opt = {};
-                if (behavior) {
-                  opt['behavior'] = behavior;
-                }
-                if (block) {
-                  opt['block'] = block;
-                }
-                if (inline) {
-                  opt['inline'] = inline;
-                }
-                elm.scrollIntoView(opt);
-              }
-              else {
-                elm.scrollIntoView();
-              }
-            }
-            else {
-              elm.scrollIntoView(alignToTop);
-            }
-          }
-          else if ('getContext' == fnc) {
-            var contentType = dat['contentType'];
-            var contextAttributes = dat['contextAttributes'];
-            var objid = dat['_id'];
-            var obj;
-            if (contextAttributes) {
-              obj = elm.getContext(contentType, contextAttributes);
-            }
-            else {
-              obj = elm.getContext(contentType);
-            }
-            objectDic[objid] = obj;
-          }
         }
       }
       if ('_createElement' in dat) {
