@@ -495,11 +495,13 @@ class WinStorage(StorageBase):
 class ThreadSafe(object):
     _disabled = False
     _tornado_thread_id = None
+    ioloop = None
 
     @classmethod
-    def set_tornado_thread_id(cls):
+    def set_tornado_thread_id(cls, ioloop):
         # must call from tornado thread
         cls._tornado_thread_id = threading.current_thread().ident
+        cls.ioloop = ioloop
 
     @classmethod
     def invoke_required(cls):
@@ -814,6 +816,10 @@ class Element(object):
                                  'alignToTop': alignToTop, 'behavior': behavior,
                                   'block': block, 'inline': inline})
 
+    def getContext(self, contextType, contextAttributes=None):
+        res = RenderingContext(self, contextType, contextAttributes)
+        return res
+
     def _dumps(self):
         # self.onload()
         str = json.dumps(self, default=self._serializer, indent=2)
@@ -1020,6 +1026,198 @@ class Element(object):
     def _style_clear(self):
         self.document._add_diff({_OBJKEY_: self._id, '_clearStyle': True})
         return True
+
+
+class DomObject(object):
+    def __init__(self, document, parent, method, objtyp, *args):
+        self._id = str(id(self))
+        self.document = document
+        self.parent = parent
+        self.method = method
+        self.objtyp = objtyp
+        self._eventlisteners = []
+        dic = {_OBJKEY_: parent._id,
+               '_win_method': '_create',
+               '_method': method,
+               '_objType': objtyp,
+               '_id': self._id,
+               'args': args,
+               '_register': True,
+               }
+        document._add_diff(dic)
+        self.document._obj_dic[self._id] = self
+
+    excepts = ('_id', 'document', 'parent', 'method', 'objtyp',
+               '_eventlisteners', '_del', 'excepts')
+
+    def __enter__(self):
+        return self
+
+    def delme(self):
+        self._raw_setattr('_del', True)
+        dic = {_OBJKEY_: self._id,
+               '_objType': 'RenderingContext',
+               '_method': '__del__',
+               }
+        self.document._add_diff(dic)
+        logger.info('{}: {}'.format(_OBJKEY_, self._id)) # tmp
+
+    def __exit__(self, exc_type, exc_value, tb):
+        if not hasattr(self, '_del'):
+            self.delme()
+
+    def __del__(self):
+        if not hasattr(self, '_del'):
+            self.delme()
+
+    def _raw_setattr(self, key, value):
+        super(DomObject, self).__setattr__(key, value)
+
+    def _raw_getattr(self, name):
+        return super(DomObject, self).__getattr__(name)
+
+    def __setattr__(self, key, value):
+        # logger.debug('thread:{} key:{} value:{}'.format(threading.current_thread().ident, key, value))
+        if key in self.excepts:
+            super(DomObject, self).__setattr__(key, value)
+            return
+        dic = {_OBJKEY_: self._id,
+               '_objType': self.objtyp,
+               '_method': 'setattr',
+               'key': key,
+               'value': value,
+               '_valueType': '',
+               }
+        self.document._add_diff(dic)
+        super(DomObject, self).__setattr__(key, value)
+
+    def __getattr__(self, name):
+        if name in self.excepts:
+            return super(DomObject, self).__getattr__(name)
+        def fnc(*args):
+            dic = {_OBJKEY_: self._id,
+                   '_objType': self.objtyp,
+                   '_method': name,
+                   'args': args,
+                   }
+            self.document._add_diff(dic)
+        self._raw_setattr(name, fnc)
+        return fnc
+
+    def _addhandler(self, fnc):
+        name = repr(fnc)
+        self.document._handlers[name] = fnc
+        return name
+
+    def addEventListener(self, type_, listener):
+        self._eventlisteners.append((type_, listener))
+        dic = {_OBJKEY_: self._id,
+               '_method':'addEventListener',
+               'args': [type_, repr(listener), ]}
+        self.document._add_diff(dic)
+        self._addhandler(listener)
+
+    def removeEventListener(self, type_, listener):
+        tpl = (type_, listener)
+        if tpl in self._eventlisteners:
+            self._eventlisteners.remove(tpl)
+            name = repr(listener)
+            dic = {_OBJKEY_: self._id,
+                   '_method': 'removeEventListener',
+                   'args': [type_, name, ]}
+            self.document._add_diff(dic)
+            del(self.document._handlers[name])
+
+
+class RenderingContext(object):
+    def __init__(self, canvas, contextType, contextAttributes=None):
+        self._id = str(id(self))
+        self.canvas = canvas
+        dic = {_OBJKEY_: canvas._id,
+               '_method': 'getContext',
+               'contentType': contextType,
+               'contextAttributes': contextAttributes,
+               '_id': self._id,
+               }
+        canvas.document._add_diff(dic)
+
+    def __enter__(self):
+        return self
+
+    def delme(self):
+        self._raw_setattr('_del', True)
+        dic = {_OBJKEY_: self._id,
+               '_objType': 'RenderingContext',
+               '_method': '__del__',
+               }
+        self.canvas.document._add_diff(dic)
+        logger.info('{}: {}'.format(_OBJKEY_, self._id)) # tmp
+
+    def __exit__(self, exc_type, exc_value, tb):
+        if not hasattr(self, '_del'):
+            self.delme()
+
+    def __del__(self):
+        if not hasattr(self, '_del'):
+            self.delme()
+
+    excepts = ('_id', 'canvas', '_del', 'excepts')
+    creates = ('createLinearGradient',
+               'createRadialGradient',
+               'createPattern',
+               )
+
+    def _raw_setattr(self, key, value):
+        super(RenderingContext, self).__setattr__(key, value)
+
+    def _raw_getattr(self, name):
+        return super(RenderingContext, self).__getattr__(name)
+
+    def __setattr__(self, key, value):
+        # logger.debug('thread:{} key:{} value:{}'.format(threading.current_thread().ident, key, value))
+        if key in self.excepts:
+            super(RenderingContext, self).__setattr__(key, value)
+            return
+        dic = {_OBJKEY_: self._id,
+               '_objType': 'RenderingContext',
+               '_method': 'setattr',
+               'key': key,
+               'value': value,
+               '_valueType': '',
+               }
+        if isinstance(value, DomObject):
+            dic['value'] = value._id
+            dic['_valueType'] = 'DomObject'
+        self.canvas.document._add_diff(dic)
+        super(RenderingContext, self).__setattr__(key, value)
+
+    def __getattr__(self, name):
+        if name in self.excepts:
+            return super(RenderingContext, self).__getattr__(name)
+        def modargs(args):
+            res = []
+            for arg in args:
+                if arg in self.canvas.document._obj_dic.values():
+                    res.append({'_id': arg._id, })
+                else:
+                    res.append(arg)
+            return res
+        if name in self.creates:
+            def fnc(*args):
+                lst = modargs(args)
+                res = DomObject(self.canvas.document, self, name, 'RenderingContext', *lst)
+                return res
+        else:
+            def fnc(*args):
+                lst = modargs(args)
+                self.canvas.document._add_diff({_OBJKEY_: self._id,
+                                                '_objType': 'RenderingContext',
+                                                '_method': name,
+                                                'args': lst,
+                                                '_register': False,
+                                                })
+        self._raw_setattr(name, fnc)
+        return fnc
 
 
 class Document(object):
@@ -1658,6 +1856,7 @@ class Window(object):
     virtual window class
     """
     def __init__(self):
+        self._id = str(id(self))
         self.document = Document(self)
         #self.name = ''
         self._socks = []
@@ -1704,33 +1903,45 @@ class Window(object):
     def invoke(self, fnc, *args, **kwargs):
         # invoke fnc   * thread safe
         logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
+        #ioloop = tornado.ioloop.IOLoop.current()
+        ioloop = ThreadSafe.ioloop
+        if ioloop is None:
+            return
 
         def f():
             fnc(*args, **kwargs)
             self.sync()
-        tornado.ioloop.IOLoop.current().add_callback(f)
+        ioloop.add_callback(f)
         return True
 
     def set_timeout(self, fnc, delay, *args, **kwargs):
         logger.debug("thread:{} self:{}".format(threading.current_thread().ident, self))
+        #ioloop = tornado.ioloop.IOLoop.current()
+        ioloop = ThreadSafe.ioloop
+        if ioloop is None:
+            return
 
         def f():
             fnc(*args, **kwargs)
             self.sync()
         # self._timeout_id += 1
-        hdl = tornado.ioloop.IOLoop.current().call_later(delay, f)
+        hdl = ioloop.call_later(delay, f)
         # self._timeout_dic[self._timeout_id] = hdl
         # return self._timeout_id
         return hdl
 
     # @window_thread_safe # PENDING
     def remove_timeout(self, hdl):
+        #ioloop = tornado.ioloop.IOLoop.current()
+        ioloop = ThreadSafe.ioloop
+        if ioloop is None:
+            return
         # hdl = self._timeout_dic.get(timeout_id)
         if hdl is None:
             logger.error('unknown timer_id')
             return False
         else:
-            tornado.ioloop.IOLoop.current().remove_timeout(hdl)
+            ioloop.remove_timeout(hdl)
             return True
 
     @staticmethod
@@ -1836,6 +2047,10 @@ class Window(object):
     def _storage_clear(self, name=''):
         self.document._add_diff({_OBJKEY_: '_' + name, 'clear': True})
         return True
+
+    def Image(self):
+        res = DomObject(self.document, self, 'Image', 'Image')
+        return res
 
 
 class GetHandler(tornado.web.RequestHandler):
@@ -2134,5 +2349,5 @@ def start_app(wins, port=8888,
         else:
             tornado.ioloop.PeriodicCallback(periodic, background_msec).start()
 
-    ioloop.add_callback(ThreadSafe.set_tornado_thread_id)
+    ioloop.add_callback(ThreadSafe.set_tornado_thread_id, ioloop)
     ioloop.start()
